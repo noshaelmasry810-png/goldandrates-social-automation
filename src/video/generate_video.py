@@ -33,6 +33,10 @@ def run(command: list[str]) -> None:
 
 def find_font(bold: bool = False) -> str:
     candidates = [
+        "/usr/local/share/fonts/Tajawal-Bold.ttf"
+        if bold else "/usr/local/share/fonts/Tajawal-Regular.ttf",
+        "/usr/share/fonts/truetype/tajawal/Tajawal-Bold.ttf"
+        if bold else "/usr/share/fonts/truetype/tajawal/Tajawal-Regular.ttf",
         "/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf"
         if bold else "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf",
         "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Bold.ttf"
@@ -55,6 +59,10 @@ def find_font(bold: bool = False) -> str:
 
 def find_latin_font(bold: bool = False) -> str:
     candidates = [
+        "/usr/local/share/fonts/Tajawal-Bold.ttf"
+        if bold else "/usr/local/share/fonts/Tajawal-Regular.ttf",
+        "/usr/share/fonts/truetype/tajawal/Tajawal-Bold.ttf"
+        if bold else "/usr/share/fonts/truetype/tajawal/Tajawal-Regular.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
         if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf"
