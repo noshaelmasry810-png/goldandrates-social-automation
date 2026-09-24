@@ -311,25 +311,26 @@ def build_gold_content(data: dict, voice_gender: str, voice_profile: dict, trend
         "سعر جرام الذهب عيار 24 و22 و21 و18."
     )
 
+    # Keep all 16 prices visible on-screen, but make narration compact enough for a 20-40s reel.
     voice_lines = [
-        "أسعار الذهب اليوم في مصر والسعودية والإمارات والكويت.",
-        "مصر: عيار 24 بـ " + money(gold["EGP"]["karats"]["24"]) + "، "
+        "أسعار الذهب اليوم.",
+        "مصر: 24 بـ " + money(gold["EGP"]["karats"]["24"]) + "، "
         + "22 بـ " + money(gold["EGP"]["karats"]["22"]) + "، "
         + "21 بـ " + money(gold["EGP"]["karats"]["21"]) + "، "
-        + "18 بـ " + money(gold["EGP"]["karats"]["18"]) + " جنيه.",
-        "السعودية: عيار 24 بـ " + money(gold["SAR"]["karats"]["24"]) + "، "
+        + "18 بـ " + money(gold["EGP"]["karats"]["18"]) + ".",
+        "السعودية: 24 بـ " + money(gold["SAR"]["karats"]["24"]) + "، "
         + "22 بـ " + money(gold["SAR"]["karats"]["22"]) + "، "
         + "21 بـ " + money(gold["SAR"]["karats"]["21"]) + "، "
-        + "18 بـ " + money(gold["SAR"]["karats"]["18"]) + " ريال.",
-        "الإمارات: عيار 24 بـ " + money(gold["AED"]["karats"]["24"]) + "، "
+        + "18 بـ " + money(gold["SAR"]["karats"]["18"]) + ".",
+        "الإمارات: 24 بـ " + money(gold["AED"]["karats"]["24"]) + "، "
         + "22 بـ " + money(gold["AED"]["karats"]["22"]) + "، "
         + "21 بـ " + money(gold["AED"]["karats"]["21"]) + "، "
-        + "18 بـ " + money(gold["AED"]["karats"]["18"]) + " درهم.",
-        "الكويت: عيار 24 بـ " + money(gold["KWD"]["karats"]["24"]) + "، "
+        + "18 بـ " + money(gold["AED"]["karats"]["18"]) + ".",
+        "الكويت: 24 بـ " + money(gold["KWD"]["karats"]["24"]) + "، "
         + "22 بـ " + money(gold["KWD"]["karats"]["22"]) + "، "
         + "21 بـ " + money(gold["KWD"]["karats"]["21"]) + "، "
-        + "18 بـ " + money(gold["KWD"]["karats"]["18"]) + " دينار.",
-        "للتفاصيل والتحديثات اليومية: ذهب وأسعار، goldandrates.com."
+        + "18 بـ " + money(gold["KWD"]["karats"]["18"]) + ".",
+        "ذهب وأسعار. goldandrates.com."
     ]
 
     description_parts = [
