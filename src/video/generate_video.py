@@ -92,6 +92,22 @@ def wrap_rtl(text: str, fnt: ImageFont.FreeTypeFont, max_width: int) -> list[str
     return lines
 
 
+def draw_centered_plain_text(
+    img: Image.Image,
+    text: str,
+    y: int,
+    size: int,
+    bold: bool = False,
+    fill=(255, 255, 255),
+) -> int:
+    draw = ImageDraw.Draw(img)
+    fnt = font(size, bold)
+    bbox = draw.textbbox((0, 0), str(text), font=fnt)
+    w = bbox[2] - bbox[0]
+    draw.text(((WIDTH - w) // 2, y), str(text), font=fnt, fill=fill)
+    return bbox[3] - bbox[1]
+
+
 def draw_centered_text(
     img: Image.Image,
     text: str,
@@ -169,7 +185,7 @@ def make_header(img: Image.Image, title: str, subtitle: str = "") -> None:
 
 def make_hook_slide(content: dict) -> Path:
     img = background(1)
-    make_header(img, "أسعار الذهب اليوم", "تحديث GoldAndRates")
+    make_header(img, "أسعار الذهب اليوم", "تحديث ذهب وأسعار")
     panel(img, (70, 430, 1010, 1270))
 
     p21 = content["karats"]["21"]
@@ -202,7 +218,7 @@ def make_hook_slide(content: dict) -> Path:
         (245, 245, 248),
     )
 
-    title = "GoldAndRates"
+    title = "ذهب وأسعار"
     d = ImageDraw.Draw(img)
     f = font(40, True)
     display = rtl(title)
@@ -275,7 +291,7 @@ def make_trend_slide(content: dict) -> Path:
     else:
         draw_centered_text(
             img,
-            "تابع حركة الذهب والأسعار اليومية مع GoldAndRates.",
+            "تابع حركة الذهب والأسعار اليومية مع ذهب وأسعار.",
             620,
             52,
             True,
@@ -301,7 +317,7 @@ def make_trend_slide(content: dict) -> Path:
 
 def make_cta_slide() -> Path:
     img = background(4)
-    make_header(img, "تابع GoldAndRates", "تحديثات الذهب اليومية")
+    make_header(img, "تابع ذهب وأسعار", "تحديثات الذهب اليومية")
     panel(img, (85, 520, 995, 1280))
 
     draw_centered_text(
@@ -330,6 +346,23 @@ def make_cta_slide() -> Path:
         False,
         850,
         (220, 223, 230),
+    )
+    draw_centered_plain_text(
+        img,
+        "goldandrates.com",
+        1165,
+        48,
+        True,
+        (255, 224, 116),
+    )
+    draw_centered_text(
+        img,
+        "ذهب وأسعار",
+        1240,
+        44,
+        True,
+        850,
+        (246, 246, 249),
     )
 
     path = FRAMES / "04_cta.png"
