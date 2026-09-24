@@ -3,7 +3,6 @@ import os
 import shutil
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -11,15 +10,20 @@ import arabic_reshaper
 from bidi.algorithm import get_display
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTENT = ROOT / "data" / "content.json"
+DATA_DIR = ROOT / "data"
 ARTIFACTS = ROOT / "artifacts"
 FRAMES = ARTIFACTS / "frames"
-AUDIO = ARTIFACTS / "goldandrates_voice.mp3"
-OUTPUT = ARTIFACTS / "goldandrates_daily.mp4"
-
+FPS = 30
 WIDTH = 1080
 HEIGHT = 1920
-FPS = 30
+
+KIND = os.environ.get("VIDEO_TYPE", "gold").strip().lower()
+CONTENT = DATA_DIR / ("gold_content.json" if KIND == "gold" else "currency_content.json")
+AUDIO = ARTIFACTS / f"goldandrates_{KIND}_voice.mp3"
+OUTPUT = ARTIFACTS / f"goldandrates_{KIND}_daily.mp4"
+
+FONT_REGULAR = None
+FONT_BOLD = None
 
 
 def run(command: list[str]) -> None:
@@ -39,35 +43,22 @@ def find_font(bold: bool = False) -> str:
     for path in candidates:
         if Path(path).exists():
             return path
-    try:
-        result = subprocess.check_output(
-            ["fc-match", "Noto Sans Arabic" if not bold else "Noto Sans Arabic:style=Bold"],
-            text=True,
-        )
-        path = result.split(":", 1)[0].strip()
-        if Path(path).exists():
-            return path
-    except Exception:
-        pass
-    raise FileNotFoundError("No Arabic-capable font was found on the runner")
+    result = subprocess.check_output(
+        ["fc-match", "Noto Sans Arabic:style=Bold" if bold else "Noto Sans Arabic"],
+        text=True,
+    )
+    path = result.split(":", 1)[0].strip()
+    if Path(path).exists():
+        return path
+    raise FileNotFoundError("No Arabic-capable font was found")
 
 
-FONT_REGULAR = find_font(False)
-FONT_BOLD = find_font(True)
-
-
-def rtl(text: str) -> str:
-    shaped = arabic_reshaper.reshape(str(text))
-    return get_display(shaped)
+def rtl(value: str) -> str:
+    return get_display(arabic_reshaper.reshape(str(value)))
 
 
 def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(FONT_BOLD if bold else FONT_REGULAR, size)
-
-
-def text_width(draw: ImageDraw.ImageDraw, text: str, fnt: ImageFont.FreeTypeFont) -> float:
-    bbox = draw.textbbox((0, 0), text, font=fnt)
-    return bbox[2] - bbox[0]
 
 
 def wrap_rtl(text: str, fnt: ImageFont.FreeTypeFont, max_width: int) -> list[str]:
@@ -77,12 +68,12 @@ def wrap_rtl(text: str, fnt: ImageFont.FreeTypeFont, max_width: int) -> list[str
 
     dummy = Image.new("RGB", (10, 10))
     draw = ImageDraw.Draw(dummy)
-    lines: list[str] = []
+    lines = []
     current = words[0]
 
     for word in words[1:]:
-        candidate = current + " " + word
-        if text_width(draw, rtl(candidate), fnt) <= max_width:
+        candidate = f"{current} {word}"
+        if draw.textbbox((0, 0), rtl(candidate), font=fnt)[2] <= max_width:
             current = candidate
         else:
             lines.append(current)
@@ -92,23 +83,7 @@ def wrap_rtl(text: str, fnt: ImageFont.FreeTypeFont, max_width: int) -> list[str
     return lines
 
 
-def draw_centered_plain_text(
-    img: Image.Image,
-    text: str,
-    y: int,
-    size: int,
-    bold: bool = False,
-    fill=(255, 255, 255),
-) -> int:
-    draw = ImageDraw.Draw(img)
-    fnt = font(size, bold)
-    bbox = draw.textbbox((0, 0), str(text), font=fnt)
-    w = bbox[2] - bbox[0]
-    draw.text(((WIDTH - w) // 2, y), str(text), font=fnt, fill=fill)
-    return bbox[3] - bbox[1]
-
-
-def draw_centered_text(
+def draw_text(
     img: Image.Image,
     text: str,
     y: int,
@@ -120,254 +95,167 @@ def draw_centered_text(
     draw = ImageDraw.Draw(img)
     fnt = font(size, bold)
     lines = wrap_rtl(text, fnt, max_width)
-    line_gap = max(10, size // 5)
-    total_h = len(lines) * size + max(0, len(lines) - 1) * line_gap
+    gap = max(10, size // 5)
     cursor = y
 
     for line in lines:
-        display_line = rtl(line)
-        bbox = draw.textbbox((0, 0), display_line, font=fnt)
-        w = bbox[2] - bbox[0]
-        x = (WIDTH - w) // 2
-        draw.text((x, cursor), display_line, font=fnt, fill=fill)
-        cursor += size + line_gap
+        display = rtl(line)
+        bbox = draw.textbbox((0, 0), display, font=fnt)
+        x = (WIDTH - (bbox[2] - bbox[0])) // 2
+        draw.text((x, cursor), display, font=fnt, fill=fill)
+        cursor += size + gap
 
-    return total_h
+    return cursor - y
+
+
+def draw_plain_center(img: Image.Image, text: str, y: int, size: int, bold: bool = False, fill=(255, 224, 116)) -> None:
+    draw = ImageDraw.Draw(img)
+    fnt = font(size, bold)
+    bbox = draw.textbbox((0, 0), str(text), font=fnt)
+    x = (WIDTH - (bbox[2] - bbox[0])) // 2
+    draw.text((x, y), str(text), font=fnt, fill=fill)
 
 
 def background(seed: int) -> Image.Image:
+    import math
+
     img = Image.new("RGB", (WIDTH, HEIGHT))
     px = img.load()
 
     for y in range(HEIGHT):
-        t = y / (HEIGHT - 1)
-        base = int(12 + 16 * (1 - t))
-        gold = int(32 + 20 * t)
+        t = y / max(1, HEIGHT - 1)
+        base = int(10 + 18 * (1 - t))
+        gold = int(28 + 24 * t)
         for x in range(WIDTH):
             glow = int(18 * max(0, 1 - abs(x - WIDTH * 0.5) / (WIDTH * 0.5)))
             px[x, y] = (base + glow // 3, base + glow // 4, gold)
 
     overlay = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(overlay)
+    d = ImageDraw.Draw(overlay)
 
-    # Soft abstract gold market lines.
-    for i in range(8):
-        y = 330 + i * 190
-        points = []
-        for x in range(0, WIDTH + 1, 90):
-            yy = y + int(40 * __import__("math").sin((x / 120.0) + seed * 0.7 + i))
-            points.append((x, yy))
-        draw.line(points, fill=(238, 194, 73, 45), width=5)
+    for i in range(9):
+        y = 320 + i * 175
+        pts = []
+        for x in range(0, WIDTH + 1, 80):
+            yy = y + int(34 * math.sin((x / 110.0) + seed * 0.8 + i))
+            pts.append((x, yy))
+        d.line(pts, fill=(238, 194, 73, 42), width=4)
 
-    # Decorative circles.
-    for i in range(14):
-        x = (seed * 83 + i * 157) % WIDTH
-        y = (seed * 47 + i * 223) % HEIGHT
-        r = 3 + (i % 4) * 3
-        draw.ellipse((x - r, y - r, x + r, y + r), fill=(248, 211, 100, 70))
+    for i in range(16):
+        x = (seed * 97 + i * 173) % WIDTH
+        y = (seed * 53 + i * 211) % HEIGHT
+        r = 3 + (i % 4) * 2
+        d.ellipse((x - r, y - r, x + r, y + r), fill=(250, 214, 110, 68))
 
     overlay = overlay.filter(ImageFilter.GaussianBlur(0.8))
     return Image.alpha_composite(img.convert("RGBA"), overlay)
 
 
-def panel(img: Image.Image, xy: tuple[int, int, int, int], alpha: int = 210) -> None:
+def panel(img: Image.Image, box: tuple[int, int, int, int]) -> None:
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
-    d.rounded_rectangle(xy, radius=34, fill=(7, 10, 18, alpha), outline=(231, 190, 76, 180), width=3)
+    d.rounded_rectangle(
+        box,
+        radius=32,
+        fill=(6, 9, 16, 218),
+        outline=(231, 190, 76, 180),
+        width=3,
+    )
     img.alpha_composite(layer)
 
 
-def make_header(img: Image.Image, title: str, subtitle: str = "") -> None:
-    draw_centered_text(img, title, 135, 62, True, 920, (248, 219, 132))
-    if subtitle:
-        draw_centered_text(img, subtitle, 225, 34, False, 900, (230, 232, 238))
+def footer(img: Image.Image) -> None:
+    draw_text(img, "ذهب وأسعار", 1775, 32, True, 850, (245, 245, 247))
+    draw_plain_center(img, "goldandrates.com", 1840, 34, True, (255, 224, 116))
 
 
-def make_hook_slide(content: dict) -> Path:
+def make_intro(content: dict) -> Path:
     img = background(1)
-    make_header(img, "أسعار الذهب اليوم", "تحديث ذهب وأسعار")
-    panel(img, (70, 430, 1010, 1270))
+    panel(img, (65, 360, 1015, 1410))
 
-    p21 = content["karats"]["21"]
-    draw_centered_text(img, "عيار 21", 545, 58, True, 900, (236, 236, 240))
-    draw_centered_text(
-        img,
-        f"{p21} جنيه",
-        650,
-        116,
-        True,
-        900,
-        (255, 223, 113),
-    )
-    draw_centered_text(
-        img,
-        "سعر الجرام اليوم",
-        820,
-        42,
-        False,
-        900,
-        (225, 225, 230),
-    )
-    draw_centered_text(
-        img,
-        "تابع الأسعار لحظة بلحظة",
-        1030,
-        48,
-        True,
-        900,
-        (245, 245, 248),
-    )
+    title = "أسعار الذهب اليوم" if KIND == "gold" else "سعر الدولار اليوم"
+    draw_text(img, title, 150, 64, True, 920, (248, 219, 132))
+    draw_text(img, content["hook"], 475, 46, True, 860, (246, 246, 248))
 
-    title = "ذهب وأسعار"
-    d = ImageDraw.Draw(img)
-    f = font(40, True)
-    display = rtl(title)
-    w = text_width(d, display, f)
-    d.text(((WIDTH - w) // 2, 1430), display, font=f, fill=(231, 190, 76))
+    if KIND == "gold":
+        first = content["videoData"]["markets"][0]
+        val = first["karats"]["21"]
+        draw_text(img, "عيار 21 في مصر", 850, 48, True, 850, (235, 236, 241))
+        draw_text(img, f"{money(val)} جنيه", 940, 104, True, 850, (255, 224, 116))
+    else:
+        rates = {item["code"]: item["value"] for item in content["videoData"]["rates"]}
+        draw_text(img, "1 دولار =", 845, 52, True, 850, (235, 236, 241))
+        draw_text(img, f"{fx_money(rates['EGP'])} جنيه مصري", 935, 90, True, 850, (255, 224, 116))
 
-    path = FRAMES / "01_hook.png"
+    footer(img)
+    path = FRAMES / "01_intro.png"
     img.convert("RGB").save(path, quality=95)
     return path
 
 
-def make_prices_slide(content: dict) -> Path:
-    img = background(2)
-    make_header(img, "أسعار الذهب اليوم", "السعر المرجعي للجرام في مصر")
+def make_gold_market_slide(item: dict, index: int) -> Path:
+    img = background(10 + index)
+    panel(img, (70, 260, 1010, 1540))
+    draw_text(img, item["name"], 340, 54, True, 900, (248, 219, 132))
+    draw_text(img, "سعر الجرام", 445, 36, False, 850, (220, 223, 230))
+
     cards = [
-        ("24", content["karats"]["24"]),
-        ("22", content["karats"]["22"]),
-        ("21", content["karats"]["21"]),
-        ("18", content["karats"]["18"]),
+        ("24", item["karats"]["24"]),
+        ("22", item["karats"]["22"]),
+        ("21", item["karats"]["21"]),
+        ("18", item["karats"]["18"]),
     ]
 
-    start_y = 390
-    card_h = 285
-    gap = 38
+    y = 585
+    for karat, value in cards:
+        panel(img, (130, y, 950, y + 190))
+        draw_text(img, f"عيار {karat}", y + 28, 42, True, 760, (244, 244, 247))
+        draw_text(img, f"{money(value)} {item['unit']}", y + 82, 58, True, 760, (255, 224, 116))
+        y += 225
 
-    for idx, (karat, value) in enumerate(cards):
-        y1 = start_y + idx * (card_h + gap)
-        panel(img, (85, y1, 995, y1 + card_h), 220)
-        draw_centered_text(img, f"عيار {karat}", y1 + 42, 48, True, 820)
-        draw_centered_text(
-            img,
-            f"{value} جنيه",
-            y1 + 116,
-            72,
-            True,
-            820,
-            (255, 224, 116),
-        )
-        draw_centered_text(
-            img,
-            "للجرام",
-            y1 + 210,
-            30,
-            False,
-            820,
-            (205, 208, 215),
-        )
-
-    path = FRAMES / "02_prices.png"
+    footer(img)
+    path = FRAMES / f"gold_{index:02d}.png"
     img.convert("RGB").save(path, quality=95)
     return path
 
 
-def make_trend_slide(content: dict) -> Path:
-    img = background(3)
-    make_header(img, "ما الجديد في سوق الذهب؟", "إشارة ترند مرتبطة بالذهب")
-    panel(img, (75, 430, 1005, 1330))
-
-    trends = content.get("trendSignals") or []
-    if trends:
-        draw_centered_text(
-            img,
-            trends[0],
-            555,
-            45,
-            True,
-            820,
-            (245, 245, 248),
-        )
-    else:
-        draw_centered_text(
-            img,
-            "تابع حركة الذهب والأسعار اليومية مع ذهب وأسعار.",
-            620,
-            52,
-            True,
-            820,
-            (245, 245, 248),
-        )
-
-    # Keep the trend separate from the price claim.
-    draw_centered_text(
-        img,
-        "تحقق من السعر الحالي قبل اتخاذ أي قرار شراء أو بيع.",
-        1080,
-        34,
-        False,
-        820,
-        (210, 213, 220),
-    )
-
-    path = FRAMES / "03_trend.png"
+def make_currency_slide(item: dict, index: int) -> Path:
+    img = background(20 + index)
+    panel(img, (70, 430, 1010, 1390))
+    draw_text(img, item["name"], 555, 58, True, 900, (248, 219, 132))
+    draw_text(img, "مقابل دولار أمريكي واحد", 690, 40, False, 900, (220, 223, 230))
+    draw_text(img, fx_money(item["value"]), 805, 108, True, 900, (255, 224, 116))
+    draw_text(img, item["unit"], 950, 48, True, 900, (244, 244, 247))
+    footer(img)
+    path = FRAMES / f"fx_{index:02d}.png"
     img.convert("RGB").save(path, quality=95)
     return path
 
 
-def make_cta_slide() -> Path:
-    img = background(4)
-    make_header(img, "تابع ذهب وأسعار", "تحديثات الذهب اليومية")
-    panel(img, (85, 520, 995, 1280))
+def make_cta() -> Path:
+    img = background(50)
+    panel(img, (70, 470, 1010, 1430))
+    draw_text(img, "ذهب وأسعار", 610, 72, True, 900, (255, 224, 116))
+    draw_text(img, "أسعار الذهب والعملات تتحدث يوميًا", 760, 50, True, 900, (246, 246, 249))
+    draw_plain_center(img, "goldandrates.com", 960, 56, True, (255, 224, 116))
+    draw_text(img, "تابع التحديث القادم", 1085, 44, False, 850, (220, 223, 230))
+    return_path = FRAMES / "99_cta.png"
+    img.convert("RGB").save(return_path, quality=95)
+    return return_path
 
-    draw_centered_text(
-        img,
-        "أسعار 24 و22 و21 و18",
-        660,
-        62,
-        True,
-        850,
-        (255, 224, 116),
-    )
-    draw_centered_text(
-        img,
-        "تتحدث يوميًا",
-        805,
-        58,
-        True,
-        850,
-        (246, 246, 249),
-    )
-    draw_centered_text(
-        img,
-        "احفظ الفيديو وتابع التحديث القادم",
-        1015,
-        42,
-        False,
-        850,
-        (220, 223, 230),
-    )
-    draw_centered_plain_text(
-        img,
-        "goldandrates.com",
-        1165,
-        48,
-        True,
-        (255, 224, 116),
-    )
-    draw_centered_text(
-        img,
-        "ذهب وأسعار",
-        1240,
-        44,
-        True,
-        850,
-        (246, 246, 249),
-    )
 
-    path = FRAMES / "04_cta.png"
-    img.convert("RGB").save(path, quality=95)
-    return path
+def money(value: float) -> str:
+    number = float(value)
+    if abs(number - round(number)) < 0.005:
+        return f"{int(round(number)):,}"
+    return f"{number:,.2f}"
+
+
+def fx_money(value: float) -> str:
+    number = float(value)
+    if number < 1:
+        return f"{number:,.4f}"
+    return f"{number:,.2f}"
 
 
 def audio_duration(path: Path) -> float:
@@ -388,9 +276,7 @@ def audio_duration(path: Path) -> float:
 
 
 def make_segment(image_path: Path, duration: float, index: int) -> Path:
-    segment = ARTIFACTS / f"segment_{index:02d}.mp4"
-    # Slow zoom gives the still design a subtle motion effect without
-    # distracting from the narrator.
+    segment = ARTIFACTS / f"{KIND}_segment_{index:02d}.mp4"
     vf = (
         "zoompan="
         "z='min(zoom+0.0007,1.08)':"
@@ -399,109 +285,84 @@ def make_segment(image_path: Path, duration: float, index: int) -> Path:
         "d=1:s=1080x1920:fps=30,"
         "format=yuv420p"
     )
-    run(
-        [
-            "ffmpeg",
-            "-y",
-            "-loop",
-            "1",
-            "-i",
-            str(image_path),
-            "-t",
-            f"{duration:.3f}",
-            "-vf",
-            vf,
-            "-an",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "medium",
-            "-crf",
-            "20",
-            str(segment),
-        ]
-    )
+    run([
+        "ffmpeg", "-y",
+        "-loop", "1",
+        "-i", str(image_path),
+        "-t", f"{duration:.3f}",
+        "-vf", vf,
+        "-an",
+        "-c:v", "libx264",
+        "-preset", "medium",
+        "-crf", "20",
+        str(segment),
+    ])
     return segment
 
 
 def concat_segments(segments: list[Path]) -> Path:
-    list_file = ARTIFACTS / "segments.txt"
+    list_file = ARTIFACTS / f"{KIND}_segments.txt"
     list_file.write_text(
         "".join(f"file '{p.as_posix().replace(chr(39), chr(39) + chr(92) + chr(39) + chr(39))}'\n" for p in segments),
         encoding="utf-8",
     )
-    silent = ARTIFACTS / "goldandrates_video_silent.mp4"
-    run(
-        [
-            "ffmpeg",
-            "-y",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            str(list_file),
-            "-c",
-            "copy",
-            str(silent),
-        ]
-    )
+    silent = ARTIFACTS / f"{KIND}_silent.mp4"
+    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file), "-c", "copy", str(silent)])
     return silent
 
 
 def mux_audio(video_path: Path, audio_path: Path, duration: float) -> None:
-    run(
-        [
-            "ffmpeg",
-            "-y",
-            "-i",
-            str(video_path),
-            "-i",
-            str(audio_path),
-            "-t",
-            f"{duration:.3f}",
-            "-map",
-            "0:v:0",
-            "-map",
-            "1:a:0",
-            "-c:v",
-            "copy",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "160k",
-            "-shortest",
-            str(OUTPUT),
-        ]
-    )
+    run([
+        "ffmpeg", "-y",
+        "-i", str(video_path),
+        "-i", str(audio_path),
+        "-t", f"{duration:.3f}",
+        "-map", "0:v:0",
+        "-map", "1:a:0",
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-b:a", "160k",
+        "-shortest",
+        str(OUTPUT),
+    ])
 
 
 def main() -> None:
+    global FONT_REGULAR, FONT_BOLD
+    if KIND not in {"gold", "currency"}:
+        raise SystemExit("VIDEO_TYPE must be gold or currency")
     if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
         raise SystemExit("ffmpeg/ffprobe is required")
     if not CONTENT.exists():
-        raise SystemExit("data/content.json not found")
+        raise SystemExit(f"{CONTENT} not found")
     if not AUDIO.exists():
-        raise SystemExit("artifacts/goldandrates_voice.mp3 not found")
+        raise SystemExit(f"{AUDIO} not found")
+
+    FONT_REGULAR = find_font(False)
+    FONT_BOLD = find_font(True)
 
     content = json.loads(CONTENT.read_text(encoding="utf-8"))
-    if content.get("language") != "ar":
-        raise SystemExit("Expected Arabic content.json")
-
     FRAMES.mkdir(parents=True, exist_ok=True)
 
-    slides = [
-        make_hook_slide(content),
-        make_prices_slide(content),
-        make_trend_slide(content),
-        make_cta_slide(),
-    ]
+    slides = [make_intro(content)]
+
+    if KIND == "gold":
+        for idx, item in enumerate(content["videoData"]["markets"], start=1):
+            slides.append(make_gold_market_slide(item, idx))
+    else:
+        for idx, item in enumerate(content["videoData"]["rates"], start=1):
+            slides.append(make_currency_slide(item, idx))
+
+    slides.append(make_cta())
 
     total = audio_duration(AUDIO)
+    if KIND == "gold":
+        middle = 0.78 / 4
+        weights = [0.18] + [middle] * 4 + [0.04]
+    else:
+        middle = 0.78 / 4
+        weights = [0.18] + [middle] * 4 + [0.04]
 
-    # Proportions match the narrative structure. The final duration is adjusted
-    # automatically so video and audio end together.
-    weights = [0.22, 0.38, 0.24, 0.16]
     durations = [total * w for w in weights]
     durations[-1] += total - sum(durations)
 
@@ -514,7 +375,8 @@ def main() -> None:
     mux_audio(silent, AUDIO, total)
 
     metadata = {
-        "generatedAt": content.get("generatedAtUtc") or content.get("generatedAt"),
+        "generatedAt": content.get("generatedAt"),
+        "videoType": KIND,
         "video": str(OUTPUT.relative_to(ROOT)),
         "width": WIDTH,
         "height": HEIGHT,
@@ -522,11 +384,14 @@ def main() -> None:
         "durationSeconds": round(total, 3),
         "voiceGender": content.get("voiceGender"),
         "voiceName": content.get("voiceName"),
+        "websiteName": "ذهب وأسعار",
+        "websiteUrl": "https://goldandrates.com/",
         "hook": content.get("hook"),
         "hashtags": content.get("hashtags", []),
+        "overrideApplied": content.get("overrideApplied", False),
     }
 
-    (ARTIFACTS / "video.json").write_text(
+    (ARTIFACTS / f"{KIND}_video.json").write_text(
         json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
