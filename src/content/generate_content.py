@@ -228,7 +228,7 @@ def generate_copy(
 
     hook = (
         f"{price_line} | "
-        "عيار 24 و22 و18 وتحديثات الذهب أولًا بأول مع GoldAndRates."
+        "عيار 24 و22 و18 وتحديثات الذهب أولًا بأول مع ذهب وأسعار."
     )
 
     voice_script = (
@@ -250,12 +250,13 @@ def generate_copy(
         f"{hook}\n\n"
         "أسعار الذهب اليوم، سعر جرام الذهب، عيار 21، عيار 24، "
         "عيار 22، عيار 18، والجنيه الذهب في مصر. "
-        "تابع GoldAndRates لمعرفة تحديثات الأسعار بشكل مستمر."
+        "تابع ذهب وأسعار لمعرفة تحديثات الأسعار بشكل مستمر."
         + trend_section
         + "\n\nالكلمات المفتاحية: "
         + "، ".join(keywords)
         + "\n\n"
         + " ".join(hashtags)
+        + "\n\nللمزيد من أسعار الذهب والتحديثات: https://goldandrates.com/"
     )
 
     return {
@@ -295,7 +296,7 @@ def main() -> None:
     payload = {
         "generatedAt": data["generatedAt"],
         "language": "ar",
-        "source": "GoldAndRates",
+        "source": "ذهب وأسعار",
         "voiceGender": voice_gender,
         "voiceName": voice_profile["voice"],
         "voiceLabel": voice_profile["label"],
@@ -312,7 +313,7 @@ def main() -> None:
         "description": copy["description"],
         "voiceScript": copy["voiceScript"],
         "videoData": {
-            "title": "أسعار الذهب اليوم",
+            "title": "أسعار الذهب اليوم - ذهب وأسعار",
             "hook": copy["hook"],
             "karats": data["karats"],
             "currency": data["currency"],
