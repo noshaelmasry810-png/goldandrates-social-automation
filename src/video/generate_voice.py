@@ -28,6 +28,9 @@ def main() -> None:
 
     voice = str(content.get("voiceName") or "").strip()
     script = str(content.get("voiceScript") or "").strip()
+    segments = content.get("voiceSegments")
+    if not isinstance(segments, list) or not segments:
+        segments = [script]
 
     if not voice:
         raise SystemExit("content file is missing voiceName")
@@ -36,11 +39,12 @@ def main() -> None:
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    TARGET_SECONDS = 30.0
     MIN_SECONDS = 20.0
     MAX_SECONDS = 40.0
+    RATE = "-5%"
+    PITCH = "+0Hz"
 
-    def probe_duration() -> float:
+    def probe_duration(path: Path) -> float:
         value = subprocess.check_output(
             [
                 "ffprobe",
@@ -50,76 +54,125 @@ def main() -> None:
                 "format=duration",
                 "-of",
                 "default=noprint_wrappers=1:nokey=1",
-                str(OUTPUT_AUDIO),
+                str(path),
             ],
             text=True,
         ).strip()
-        return float(value)
+        return max(0.01, float(value))
 
-    async def synthesize(rate: str) -> None:
+    async def synthesize(text: str, output: Path) -> None:
         communicate = edge_tts.Communicate(
-            text=script,
+            text=text,
             voice=voice,
-            rate=rate,
+            rate=RATE,
+            pitch=PITCH,
             volume="+0%",
         )
-        await communicate.save(str(OUTPUT_AUDIO))
+        await communicate.save(str(output))
+
+    segment_files: list[Path] = []
+    durations: list[float] = []
 
     try:
-        asyncio.run(synthesize("+0%"))
-        baseline = probe_duration()
+        for index, segment_text in enumerate(segments, start=1):
+            text_value = str(segment_text).strip()
+            if not text_value:
+                continue
+            output = OUTPUT_DIR / f"{KIND}_voice_segment_{index:02d}.mp3"
+            output.unlink(missing_ok=True)
+            asyncio.run(synthesize(text_value, output))
+            duration = probe_duration(output)
+            if not output.exists() or output.stat().st_size == 0:
+                raise RuntimeError(f"Voice segment was not created: {output}")
+            segment_files.append(output)
+            durations.append(duration)
+            print(f"Voice segment {index}: {duration:.2f}s | {text_value}")
 
-        # Aim near 30s without exceeding the service's practical ±100% range.
-        requested = round((baseline / TARGET_SECONDS - 1.0) * 100)
-        requested = max(-50, min(100, requested))
+        if not segment_files:
+            raise SystemExit("No voice segments were generated")
 
-        if abs(baseline - TARGET_SECONDS) > 1.0:
-            rate = f"{requested:+d}%"
-            print(f"Baseline duration: {baseline:.2f}s; retiming voice with rate {rate}")
-            asyncio.run(synthesize(rate))
-        else:
-            rate = "+0%"
+        list_file = OUTPUT_DIR / f"{KIND}_voice_segments.txt"
+        list_file.write_text(
+            "".join(f"file '{p.as_posix()}'\n" for p in segment_files),
+            encoding="utf-8",
+        )
 
-        duration = probe_duration()
+        concat_raw = OUTPUT_DIR / f"{KIND}_voice_concat.mp3"
+        run_cmd = [
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0",
+            "-i", str(list_file),
+            "-c:a", "libmp3lame",
+            "-b:a", "160k",
+            str(concat_raw),
+        ]
+        print(">", " ".join(run_cmd), flush=True)
+        subprocess.run(run_cmd, check=True)
 
-        if duration > MAX_SECONDS and rate != "+100%":
-            print("Voice is still above 40s; retrying at +100% rate.")
-            asyncio.run(synthesize("+100%"))
-            duration = probe_duration()
-            rate = "+100%"
-
-        if duration > MAX_SECONDS:
+        total = probe_duration(concat_raw)
+        if total > MAX_SECONDS:
             raise SystemExit(
-                f"Generated narration is {duration:.2f}s, above the {MAX_SECONDS:.0f}s limit. "
-                "Shorten the voiceScript."
+                f"Generated narration is {total:.2f}s, above the {MAX_SECONDS:.0f}s limit. "
+                "Shorten the voiceSegments."
             )
 
-        if duration < MIN_SECONDS:
-            print(f"Voice is {duration:.2f}s; keeping it because the script is already compact.")
-        
+        # Keep the reel at least 20s without changing speech timing:
+        # any required padding is assigned to the final CTA scene.
+        pad_seconds = max(0.0, MIN_SECONDS - total)
+        if pad_seconds > 0:
+            padded = OUTPUT_DIR / f"{KIND}_voice_padded.mp3"
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", str(concat_raw),
+                "-af", "apad",
+                "-t", f"{MIN_SECONDS:.3f}",
+                "-c:a", "libmp3lame",
+                "-b:a", "160k",
+                str(padded),
+            ]
+            print(">", " ".join(cmd), flush=True)
+            subprocess.run(cmd, check=True)
+            padded.replace(OUTPUT_AUDIO)
+            durations[-1] += pad_seconds
+            total = MIN_SECONDS
+        else:
+            concat_raw.replace(OUTPUT_AUDIO)
+
     except Exception as exc:
         print(f"Voice generation failed: {exc}", file=sys.stderr)
         raise SystemExit(1)
 
-    metadata = {
+    timing = {
         "generatedAt": content.get("generatedAt"),
         "videoType": KIND,
         "voiceGender": content.get("voiceGender"),
         "voiceName": voice,
         "voiceLabel": content.get("voiceLabel"),
-        "speechRate": rate,
-        "durationSeconds": round(duration, 3),
         "voiceLocale": content.get("voiceLocale"),
+        "speechRate": RATE,
+        "speechPitch": PITCH,
+        "durationSeconds": round(total, 3),
+        "segments": [
+            {
+                "index": index,
+                "text": str(text).strip(),
+                "durationSeconds": round(duration, 3),
+            }
+            for index, (text, duration) in enumerate(zip(segments, durations), start=1)
+        ],
         "audioFile": str(OUTPUT_AUDIO.relative_to(ROOT)),
     }
 
     OUTPUT_META.write_text(
-        json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
+        json.dumps(timing, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
 
     print(f"Generated voice: {voice}")
     print(f"Audio: {OUTPUT_AUDIO}")
+    print(f"Duration: {total:.2f}s")
+
+
 
 
 if __name__ == "__main__":
