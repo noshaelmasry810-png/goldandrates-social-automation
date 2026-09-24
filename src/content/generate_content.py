@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 import urllib.request
@@ -12,6 +13,19 @@ OUTPUT = ROOT / "data" / "content.json"
 TREND_GEOS = ["EG", "SA"]
 TREND_URL = "https://trends.google.com/trending/rss?geo={geo}"
 REQUEST_TIMEOUT = 15
+
+VOICE_PROFILES = {
+    "male": {
+        "voice": "ar-EG-ShakirNeural",
+        "label": "رجل مصري",
+        "locale": "ar-EG",
+    },
+    "female": {
+        "voice": "ar-EG-SalmaNeural",
+        "label": "امرأة مصرية",
+        "locale": "ar-EG",
+    },
+}
 
 CORE_KEYWORDS = [
     "سعر الذهب اليوم",
@@ -28,8 +42,6 @@ CORE_KEYWORDS = [
     "تحليل أسعار الذهب",
 ]
 
-# A trend is promoted only when the title contains a direct gold/precious-metals
-# signal. Generic words such as "دولار" or "سعر" are intentionally insufficient.
 DIRECT_GOLD_TERMS = [
     "الذهب",
     "ذهب",
@@ -191,6 +203,16 @@ def build_hashtags(related_trends: list[str]) -> list[str]:
     return hashtags
 
 
+def choose_daily_voice() -> tuple[str, dict]:
+    # Stable per calendar day: rerunning the workflow the same day does not
+    # unexpectedly switch the speaker. The hash makes the choice appear random
+    # across days rather than simply alternating male/female.
+    day_key = datetime.now(timezone.utc).date().isoformat()
+    digest = hashlib.sha256(day_key.encode("utf-8")).hexdigest()
+    gender = "male" if int(digest[0], 16) % 2 == 0 else "female"
+    return gender, VOICE_PROFILES[gender]
+
+
 def generate_copy(
     data: dict,
     keywords: list[str],
@@ -204,9 +226,6 @@ def generate_copy(
         f"سعر الذهب اليوم في مصر: عيار 21 = {p['21']} {currency}"
     )
 
-    # Keep the spoken hook focused on the actual gold update.
-    # Trend context is stored separately so unrelated news never contaminates
-    # the voice script.
     hook = (
         f"{price_line} | "
         "عيار 24 و22 و18 وتحديثات الذهب أولًا بأول مع GoldAndRates."
@@ -269,6 +288,7 @@ def main() -> None:
     related_trends = trend_signals[:5]
     keywords = build_keywords(related_trends)
     hashtags = build_hashtags(related_trends)
+    voice_gender, voice_profile = choose_daily_voice()
 
     copy = generate_copy(data, keywords, hashtags, related_trends)
 
@@ -276,6 +296,10 @@ def main() -> None:
         "generatedAt": data["generatedAt"],
         "language": "ar",
         "source": "GoldAndRates",
+        "voiceGender": voice_gender,
+        "voiceName": voice_profile["voice"],
+        "voiceLabel": voice_profile["label"],
+        "voiceLocale": voice_profile["locale"],
         "trendSource": "Google Trends Trending Now RSS",
         "trendGeos": TREND_GEOS,
         "trendSignals": related_trends,
@@ -292,6 +316,10 @@ def main() -> None:
             "hook": copy["hook"],
             "karats": data["karats"],
             "currency": data["currency"],
+            "voiceGender": voice_gender,
+            "voiceName": voice_profile["voice"],
+            "voiceLabel": voice_profile["label"],
+            "voiceLocale": voice_profile["locale"],
             "keywords": keywords,
             "hashtags": hashtags,
             "trendSignals": related_trends,
