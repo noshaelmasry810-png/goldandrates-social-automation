@@ -4,6 +4,7 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -11,10 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "data" / "market_data.json"
 
 GOLD_CODES = ["EGP", "SAR", "AED", "KWD"]
-GOLD_API_TEMPLATE = os.environ.get(
-    "GOLDANDRATES_PRICE_API_URL_TEMPLATE",
-    "",
-).strip()
+GOLD_API_URL = os.environ.get("GOLDANDRATES_PRICE_API_URL", "").strip()
 FX_URL = "https://open.er-api.com/v6/latest/USD"
 
 TIMEOUT = 60
@@ -26,7 +24,7 @@ def fetch_json(url: str) -> dict:
     request = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "GoldAndRates-Social-Automation/2.0",
+            "User-Agent": "GoldAndRates-Social-Automation/3.0",
             "Accept": "application/json,text/plain,*/*",
             "Cache-Control": "no-cache",
         },
@@ -52,18 +50,29 @@ def fetch_json(url: str) -> dict:
     raise last_error or RuntimeError("Request failed")
 
 
-def fetch_gold(code: str) -> tuple[str, dict]:
-    if not GOLD_API_TEMPLATE:
-        raise RuntimeError("GOLDANDRATES_PRICE_API_URL_TEMPLATE is not configured")
+def gold_url(code: str) -> str:
+    if not GOLD_API_URL:
+        raise RuntimeError("GOLDANDRATES_PRICE_API_URL is not configured")
 
-    url = GOLD_API_TEMPLATE.format(code=code)
-    payload = fetch_json(url)
+    parsed = urllib.parse.urlsplit(GOLD_API_URL)
+    params = dict(urllib.parse.parse_qsl(parsed.query, keep_blank_values=True))
+    params["code"] = code
+    query = urllib.parse.urlencode(params)
+
+    return urllib.parse.urlunsplit(
+        (parsed.scheme, parsed.netloc, parsed.path, query, parsed.fragment)
+    )
+
+
+def fetch_gold(code: str) -> tuple[str, dict]:
+    payload = fetch_json(gold_url(code))
 
     if not isinstance(payload, dict):
         raise ValueError(f"{code}: API response is not a JSON object")
 
     karats = payload.get("karats") or {}
     required = ("24", "22", "21", "18")
+
     if not all(k in karats and float(karats[k] or 0) > 0 for k in required):
         raise ValueError(f"{code}: missing usable 24K/22K/21K/18K prices")
 
@@ -84,9 +93,9 @@ def fetch_gold(code: str) -> tuple[str, dict]:
 
 def fetch_fx() -> dict:
     payload = fetch_json(FX_URL)
-
     rates = payload.get("rates") or {}
     needed = ["EGP", "SAR", "AED", "KWD"]
+
     if not all(float(rates.get(k, 0) or 0) > 0 for k in needed):
         raise ValueError("FX API is missing EGP/SAR/AED/KWD rates")
 
@@ -108,8 +117,8 @@ def main() -> int:
     }
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {executor.submit(fetch_gold, code): code for code in GOLD_CODES}
-        for future, code in [(f, futures[f]) for f in futures]:
+        futures = {code: executor.submit(fetch_gold, code) for code in GOLD_CODES}
+        for code, future in futures.items():
             try:
                 key, value = future.result()
                 market_data["gold"][key] = value
