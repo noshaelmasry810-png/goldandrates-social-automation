@@ -1,12 +1,12 @@
 {
-  "generatedAt": null,
-  "source": null,
+  "generatedAt": "2026-09-23T22:50:19.043Z",
+  "source": "GoldAndRates",
   "currency": "EGP",
   "karats": {
-    "18": null,
-    "21": null,
-    "22": null,
-    "24": null
+    "24": 7074.25,
+    "22": 6499,
+    "21": 6185,
+    "18": 5300
   },
-  "status": "not_generated"
+  "status": "ok"
 }
