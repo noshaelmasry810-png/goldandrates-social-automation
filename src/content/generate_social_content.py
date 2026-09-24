@@ -311,26 +311,15 @@ def build_gold_content(data: dict, voice_gender: str, voice_profile: dict, trend
         "سعر جرام الذهب عيار 24 و22 و21 و18."
     )
 
-    # Keep all 16 prices visible on-screen, but make narration compact enough for a 20-40s reel.
+    # The video shows all 24K/22K/21K/18K prices on-screen.
+    # Narration stays concise: one headline price per market for a natural 20-40s reel.
     voice_lines = [
-        "أسعار الذهب اليوم.",
-        "مصر: 24 بـ " + money(gold["EGP"]["karats"]["24"]) + "، "
-        + "22 بـ " + money(gold["EGP"]["karats"]["22"]) + "، "
-        + "21 بـ " + money(gold["EGP"]["karats"]["21"]) + "، "
-        + "18 بـ " + money(gold["EGP"]["karats"]["18"]) + ".",
-        "السعودية: 24 بـ " + money(gold["SAR"]["karats"]["24"]) + "، "
-        + "22 بـ " + money(gold["SAR"]["karats"]["22"]) + "، "
-        + "21 بـ " + money(gold["SAR"]["karats"]["21"]) + "، "
-        + "18 بـ " + money(gold["SAR"]["karats"]["18"]) + ".",
-        "الإمارات: 24 بـ " + money(gold["AED"]["karats"]["24"]) + "، "
-        + "22 بـ " + money(gold["AED"]["karats"]["22"]) + "، "
-        + "21 بـ " + money(gold["AED"]["karats"]["21"]) + "، "
-        + "18 بـ " + money(gold["AED"]["karats"]["18"]) + ".",
-        "الكويت: 24 بـ " + money(gold["KWD"]["karats"]["24"]) + "، "
-        + "22 بـ " + money(gold["KWD"]["karats"]["22"]) + "، "
-        + "21 بـ " + money(gold["KWD"]["karats"]["21"]) + "، "
-        + "18 بـ " + money(gold["KWD"]["karats"]["18"]) + ".",
-        "ذهب وأسعار. goldandrates.com."
+        "أسعار الذهب اليوم من ذهب وأسعار.",
+        "في مصر، عيار 21: " + money(gold["EGP"]["karats"]["21"]) + " جنيه.",
+        "في السعودية، عيار 21: " + money(gold["SAR"]["karats"]["21"]) + " ريال.",
+        "في الإمارات، عيار 21: " + money(gold["AED"]["karats"]["21"]) + " درهم.",
+        "في الكويت، عيار 21: " + money(gold["KWD"]["karats"]["21"]) + " دينار.",
+        "للتحديثات اليومية: goldandrates.com."
     ]
 
     description_parts = [
