@@ -257,12 +257,11 @@ def apply_overrides(market_data: dict, override: dict) -> dict:
 
 
 def choose_daily_voice() -> tuple[str, dict]:
-    voice_date = os.environ.get(
-        "VOICE_DATE",
-        datetime.now(timezone.utc).date().isoformat(),
-    )
-    digest = hashlib.sha256(voice_date.encode("utf-8")).hexdigest()
-    gender = "male" if int(digest[0], 16) % 2 == 0 else "female"
+    # Keep the presenter consistently Egyptian and natural.
+    # VOICE_GENDER can be set to "female" to use Salma instead.
+    gender = os.environ.get("VOICE_GENDER", "male").strip().lower()
+    if gender not in VOICE_PROFILES:
+        gender = "male"
     return gender, VOICE_PROFILES[gender]
 
 
@@ -312,14 +311,15 @@ def build_gold_content(data: dict, voice_gender: str, voice_profile: dict, trend
     )
 
     # The video shows all 24K/22K/21K/18K prices on-screen.
-    # Narration stays concise: one headline price per market for a natural 20-40s reel.
+    # Narration is intentionally conversational Egyptian Arabic and split by scene
+    # so every spoken market has a matching visual card.
     voice_lines = [
-        "أسعار الذهب اليوم من ذهب وأسعار.",
-        "في مصر، عيار 21: " + money(gold["EGP"]["karats"]["21"]) + " جنيه.",
-        "في السعودية، عيار 21: " + money(gold["SAR"]["karats"]["21"]) + " ريال.",
-        "في الإمارات، عيار 21: " + money(gold["AED"]["karats"]["21"]) + " درهم.",
-        "في الكويت، عيار 21: " + money(gold["KWD"]["karats"]["21"]) + " دينار.",
-        "للتحديثات اليومية: goldandrates.com."
+        "بصّوا معانا على أسعار الذهب النهارده من موقع ذهب وأسعار.",
+        "في مصر، جرام الذهب عيار 21 بـ " + money(gold["EGP"]["karats"]["21"]) + " جنيه.",
+        "في السعودية، جرام الذهب عيار 21 بـ " + money(gold["SAR"]["karats"]["21"]) + " ريال.",
+        "وفي الإمارات، جرام الذهب عيار 21 بـ " + money(gold["AED"]["karats"]["21"]) + " درهم.",
+        "أما الكويت، فجرام الذهب عيار 21 بـ " + money(gold["KWD"]["karats"]["21"]) + " دينار.",
+        "ولكل الأسعار والتحديثات أول بأول، تابعوا موقع ذهب وأسعار على goldandrates.com."
     ]
 
     description_parts = [
@@ -337,7 +337,7 @@ def build_gold_content(data: dict, voice_gender: str, voice_profile: dict, trend
 
     description_parts.extend([
         "",
-        "ذهب وأسعار",
+        "موقع ذهب وأسعار",
         "goldandrates.com",
         "",
         " ".join(hashtags),
@@ -358,9 +358,10 @@ def build_gold_content(data: dict, voice_gender: str, voice_profile: dict, trend
         "caption": "\n".join(description_parts),
         "description": "\n".join(description_parts),
         "voiceScript": " ".join(voice_lines),
+        "voiceSegments": voice_lines,
         "videoData": {
-            "title": "أسعار الذهب اليوم - ذهب وأسعار",
-            "websiteName": "ذهب وأسعار",
+            "title": "أسعار الذهب اليوم - موقع ذهب وأسعار",
+            "websiteName": "موقع ذهب وأسعار",
             "websiteUrl": "https://goldandrates.com/",
             "markets": prices,
             "hook": hook,
@@ -385,15 +386,15 @@ def build_currency_content(data: dict, voice_gender: str, voice_profile: dict, t
         "والدرهم الإماراتي والدينار الكويتي؟"
     )
 
-    voice_script = (
-        "سعر الدولار اليوم. "
-        + "واحد دولار يساوي "
-        + fx_money(rates["EGP"]) + " جنيه مصري. "
-        + fx_money(rates["SAR"]) + " ريال سعودي. "
-        + fx_money(rates["AED"]) + " درهم إماراتي. "
-        + fx_money(rates["KWD"]) + " دينار كويتي. "
-        + "للتفاصيل والتحديثات اليومية، تابع ذهب وأسعار على goldandrates.com."
-    )
+    voice_segments = [
+        "بصّوا معانا على سعر الدولار النهارده.",
+        "الدولار النهارده بـ " + fx_money(rates["EGP"]) + " جنيه مصري.",
+        "في السعودية، الدولار بـ " + fx_money(rates["SAR"]) + " ريال.",
+        "وفي الإمارات، الدولار بـ " + fx_money(rates["AED"]) + " درهم.",
+        "أما الكويت، فالدولار بـ " + fx_money(rates["KWD"]) + " دينار.",
+        "ولكل الأسعار والتحديثات أول بأول، تابعوا موقع ذهب وأسعار على goldandrates.com."
+    ]
+    voice_script = " ".join(voice_segments)
 
     description_parts = [
         hook,
@@ -425,8 +426,9 @@ def build_currency_content(data: dict, voice_gender: str, voice_profile: dict, t
         "caption": "\n".join(description_parts),
         "description": "\n".join(description_parts),
         "voiceScript": voice_script,
+        "voiceSegments": voice_segments,
         "videoData": {
-            "title": "سعر الدولار اليوم - ذهب وأسعار",
+            "title": "سعر الدولار اليوم - موقع ذهب وأسعار",
             "websiteName": "ذهب وأسعار",
             "websiteUrl": "https://goldandrates.com/",
             "rates": values,
