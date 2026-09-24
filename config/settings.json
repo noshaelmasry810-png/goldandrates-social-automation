@@ -1,21 +1,52 @@
 {
   "project": "GoldAndRates Social Automation",
-  "version": "1.0.0",
-  "timezone": "Africa/Cairo",
-  "currency": "EGP",
-  "priceSource": {
-    "type": "http_json",
-    "urlEnv": "GOLDANDRATES_PRICE_API_URL",
-    "timeoutMs": 15000
+  "version": "2.0.0",
+  "brand": {
+    "name": "ذهب وأسعار",
+    "website": "https://goldandrates.com/"
   },
-  "content": {
-    "language": "ar",
-    "defaultKarat": 21,
-    "karats": [
-      24,
-      22,
-      21,
-      18
+  "timezone": "Asia/Riyadh",
+  "dailyScheduleUtc": {
+    "goldVideo": "0 7 * * *",
+    "currencyVideo": "0 8 * * *"
+  },
+  "goldMarkets": [
+    "EGP",
+    "SAR",
+    "AED",
+    "KWD"
+  ],
+  "goldKarats": [
+    24,
+    22,
+    21,
+    18
+  ],
+  "currencyVideo": {
+    "base": "USD",
+    "targets": [
+      "EGP",
+      "SAR",
+      "AED",
+      "KWD"
     ]
+  },
+  "voices": {
+    "male": "ar-EG-ShakirNeural",
+    "female": "ar-EG-SalmaNeural",
+    "selection": "stable-daily"
+  },
+  "trendSources": [
+    "Google Trends Trending Now RSS"
+  ],
+  "priceSource": {
+    "type": "goldandrates_apps_script",
+    "urlEnv": "GOLDANDRATES_PRICE_API_URL",
+    "timeoutMs": 60000,
+    "retries": 3
+  },
+  "manualReplacement": {
+    "workflow": ".github/workflows/replacement-video.yml",
+    "overrideFile": "data/manual_overrides.json"
   }
 }
