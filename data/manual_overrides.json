@@ -1,0 +1,38 @@
+{
+  "active": false,
+  "date": "2026-09-24",
+  "force": false,
+  "gold": {
+    "EGP": {
+      "24": null,
+      "22": null,
+      "21": null,
+      "18": null
+    },
+    "SAR": {
+      "24": null,
+      "22": null,
+      "21": null,
+      "18": null
+    },
+    "AED": {
+      "24": null,
+      "22": null,
+      "21": null,
+      "18": null
+    },
+    "KWD": {
+      "24": null,
+      "22": null,
+      "21": null,
+      "18": null
+    }
+  },
+  "fx": {
+    "EGP": null,
+    "SAR": null,
+    "AED": null,
+    "KWD": null
+  },
+  "note": "Set active=true and enter only the values that need correction, then run the replacement workflow."
+}
