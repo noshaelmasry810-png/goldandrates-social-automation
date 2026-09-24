@@ -31,6 +31,7 @@ HEIGHT = 1920
 KIND = os.environ.get("VIDEO_TYPE", "gold").strip().lower()
 CONTENT = DATA_DIR / ("gold_content.json" if KIND == "gold" else "currency_content.json")
 AUDIO = ARTIFACTS / f"goldandrates_{KIND}_voice.mp3"
+VOICE_TIMING = ARTIFACTS / f"{KIND}_voice.json"
 OUTPUT = ARTIFACTS / f"goldandrates_{KIND}_daily.mp4"
 
 FONT_REGULAR: str | None = None
@@ -236,7 +237,7 @@ def panel(img: Image.Image, box: tuple[int, int, int, int]) -> None:
 
 
 def footer(img: Image.Image) -> None:
-    draw_text(img, "ذهب وأسعار", 1775, 32, True, 850, (245, 245, 247))
+    draw_text(img, "موقع ذهب وأسعار", 1775, 32, True, 850, (245, 245, 247))
     draw_plain_center(img, "goldandrates.com", 1840, 34, True, (255, 224, 116))
 
 
@@ -306,7 +307,7 @@ def make_currency_slide(item: dict, index: int) -> Path:
 def make_cta() -> Path:
     img = background(50)
     panel(img, (70, 470, 1010, 1430))
-    draw_text(img, "ذهب وأسعار", 610, 72, True, 900, (255, 224, 116))
+    draw_text(img, "موقع ذهب وأسعار", 610, 72, True, 900, (255, 224, 116))
     draw_text(img, "أسعار الذهب والعملات تتحدث يوميًا", 760, 50, True, 900, (246, 246, 249))
     draw_plain_center(img, "goldandrates.com", 960, 56, True, (255, 224, 116))
     draw_text(img, "تابع التحديث القادم", 1085, 44, False, 850, (220, 223, 230))
@@ -446,6 +447,14 @@ def main() -> None:
     print(f"Bold font: {FONT_BOLD}", flush=True)
 
     content = json.loads(CONTENT.read_text(encoding="utf-8"))
+    if not VOICE_TIMING.exists():
+        raise SystemExit(f"{VOICE_TIMING} not found")
+    voice_timing = json.loads(VOICE_TIMING.read_text(encoding="utf-8"))
+    scene_durations = [
+        float(item["durationSeconds"])
+        for item in voice_timing.get("segments", [])
+        if float(item.get("durationSeconds", 0)) > 0
+    ]
     FRAMES.mkdir(parents=True, exist_ok=True)
 
     for old in ARTIFACTS.glob(f"{KIND}_segment_*.mp4"):
@@ -464,18 +473,20 @@ def main() -> None:
     slides.append(make_cta())
 
     voice_duration = audio_duration(AUDIO)
-    # Reel-safe output: minimum 20s, maximum 40s, target around 30s.
-    total = min(40.0, max(20.0, voice_duration))
+    total = voice_duration
 
-    if voice_duration > 40.0:
+    if voice_duration < 20.0 or voice_duration > 40.0:
         raise SystemExit(
-            f"Generated narration is {voice_duration:.2f}s, above the 40s reel limit."
+            f"Generated narration duration is {voice_duration:.2f}s; expected 20-40s."
         )
 
-    weights = [0.18] + [0.195] * 4 + [0.04]
-    durations = [total * weight for weight in weights]
-    durations[-1] += total - sum(durations)
+    if len(scene_durations) != len(slides):
+        raise SystemExit(
+            f"Voice/video scene mismatch: {len(scene_durations)} voice segments for "
+            f"{len(slides)} video slides."
+        )
 
+    durations = scene_durations
     segments = [
         make_segment(slides[i], durations[i], i + 1)
         for i in range(len(slides))
@@ -494,7 +505,7 @@ def main() -> None:
         "durationSeconds": round(total, 3),
         "voiceGender": content.get("voiceGender"),
         "voiceName": content.get("voiceName"),
-        "websiteName": "ذهب وأسعار",
+        "websiteName": "موقع ذهب وأسعار",
         "websiteUrl": "https://goldandrates.com/",
         "font": "Tajawal",
         "arabicRtl": True,
@@ -510,6 +521,7 @@ def main() -> None:
 
     print(f"Generated: {OUTPUT}", flush=True)
     print(f"Duration: {total:.2f}s", flush=True)
+    print(f"Scene durations: {[round(x, 2) for x in durations]}", flush=True)
 
 
 if __name__ == "__main__":
