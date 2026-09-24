@@ -67,6 +67,11 @@ jobs:
       - name: Generate 1080x1920 gold video
         run: python src/video/generate_video.py
 
+      - name: Validate gold MP4
+        run: |
+          test -s artifacts/goldandrates_gold_daily.mp4
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 artifacts/goldandrates_gold_daily.mp4
+
       - name: Upload gold video
         uses: actions/upload-artifact@v4
         with:
@@ -134,6 +139,11 @@ jobs:
 
       - name: Generate 1080x1920 currency video
         run: python src/video/generate_video.py
+
+      - name: Validate currency MP4
+        run: |
+          test -s artifacts/goldandrates_currency_daily.mp4
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 artifacts/goldandrates_currency_daily.mp4
 
       - name: Upload currency video
         uses: actions/upload-artifact@v4
