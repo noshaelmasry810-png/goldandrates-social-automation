@@ -44,7 +44,12 @@ jobs:
       - name: Install video dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-noto-core fontconfig
+          sudo apt-get install -y ffmpeg fonts-noto-core fontconfig curl
+          sudo mkdir -p /usr/local/share/fonts
+          sudo curl -fsSL https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Regular.ttf -o /usr/local/share/fonts/Tajawal-Regular.ttf
+          sudo curl -fsSL https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Bold.ttf -o /usr/local/share/fonts/Tajawal-Bold.ttf
+          sudo curl -fsSL https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Medium.ttf -o /usr/local/share/fonts/Tajawal-Medium.ttf
+          sudo fc-cache -f
           python -m pip install --upgrade edge-tts pillow arabic-reshaper python-bidi
 
       - name: Fetch current gold markets and FX
