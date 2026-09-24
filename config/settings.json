@@ -48,5 +48,10 @@
   "manualReplacement": {
     "workflow": ".github/workflows/replacement-video.yml",
     "overrideFile": "data/manual_overrides.json"
+  },
+  "videoDuration": {
+    "targetSeconds": 30,
+    "minSeconds": 20,
+    "maxSeconds": 40
   }
 }
