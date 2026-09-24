@@ -1,27 +1,37 @@
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 
 import edge_tts
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTENT = ROOT / "data" / "content.json"
+DATA_DIR = ROOT / "data"
 OUTPUT_DIR = ROOT / "artifacts"
-OUTPUT_AUDIO = OUTPUT_DIR / "goldandrates_voice.mp3"
-OUTPUT_META = OUTPUT_DIR / "voice.json"
+
+KIND = os.environ.get("VIDEO_TYPE", "gold").strip().lower()
+CONTENT = DATA_DIR / ("gold_content.json" if KIND == "gold" else "currency_content.json")
+OUTPUT_AUDIO = OUTPUT_DIR / f"goldandrates_{KIND}_voice.mp3"
+OUTPUT_META = OUTPUT_DIR / f"{KIND}_voice.json"
 
 
 def main() -> None:
+    if KIND not in {"gold", "currency"}:
+        raise SystemExit("VIDEO_TYPE must be gold or currency")
+
+    if not CONTENT.exists():
+        raise SystemExit(f"{CONTENT} not found")
+
     content = json.loads(CONTENT.read_text(encoding="utf-8"))
 
     voice = str(content.get("voiceName") or "").strip()
     script = str(content.get("voiceScript") or "").strip()
 
     if not voice:
-        raise SystemExit("content.json is missing voiceName")
+        raise SystemExit("content file is missing voiceName")
     if not script:
-        raise SystemExit("content.json is missing voiceScript")
+        raise SystemExit("content file is missing voiceScript")
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -41,7 +51,8 @@ def main() -> None:
         raise SystemExit(1)
 
     metadata = {
-        "generatedAt": content.get("generatedAtUtc") or content.get("generatedAt"),
+        "generatedAt": content.get("generatedAt"),
+        "videoType": KIND,
         "voiceGender": content.get("voiceGender"),
         "voiceName": voice,
         "voiceLabel": content.get("voiceLabel"),
