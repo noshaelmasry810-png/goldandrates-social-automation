@@ -13,38 +13,64 @@ TREND_GEOS = ["EG", "SA"]
 TREND_URL = "https://trends.google.com/trending/rss?geo={geo}"
 REQUEST_TIMEOUT = 15
 
-# Strong, evergreen search terms tightly related to the GoldAndRates niche.
 CORE_KEYWORDS = [
     "سعر الذهب اليوم",
-    "أسعار الذهب",
+    "أسعار الذهب اليوم",
     "سعر الذهب في مصر",
-    "عيار 21",
-    "عيار 24",
     "سعر جرام الذهب",
     "سعر الذهب الآن",
+    "عيار 21",
+    "عيار 24",
+    "عيار 22",
+    "عيار 18",
     "الجنيه الذهب",
     "الذهب اليوم",
-    "تحليل الذهب",
+    "تحليل أسعار الذهب",
 ]
 
-# Trend signals are only promoted into the copy when they are clearly
-# relevant to gold/finance. Unrelated trending topics are ignored.
-RELEVANCE_TERMS = {
-    "ذهب", "الذهب", "gold", "فضة", "silver", "سعر", "اسعار", "أسعار",
-    "جنيه", "اقتصاد", "اقتصادية", "اقتصاديات", "دولار", "الدولار",
-    "عملة", "عملات", "تضخم", "inflation", "اقتصاد", "بورصة", "أسواق",
-    "market", "markets", "finance", "financial", "xau", "bullion",
-}
+# A trend is promoted only when the title contains a direct gold/precious-metals
+# signal. Generic words such as "دولار" or "سعر" are intentionally insufficient.
+DIRECT_GOLD_TERMS = [
+    "الذهب",
+    "ذهب",
+    "gold",
+    "gold price",
+    "gold prices",
+    "سعر الذهب",
+    "اسعار الذهب",
+    "أسعار الذهب",
+    "عيار 18",
+    "عيار 21",
+    "عيار 22",
+    "عيار 24",
+    "جرام الذهب",
+    "الجنيه الذهب",
+    "سبائك الذهب",
+    "سبيكة ذهب",
+    "xau",
+    "bullion",
+]
+
+TREND_HASHTAG_RULES = [
+    (["سعر الذهب", "اسعار الذهب", "أسعار الذهب"], "#سعر_الذهب"),
+    (["عيار 21"], "#عيار_21"),
+    (["عيار 24"], "#عيار_24"),
+    (["عيار 22"], "#عيار_22"),
+    (["عيار 18"], "#عيار_18"),
+    (["الجنيه الذهب"], "#الجنيه_الذهب"),
+    (["سبائك الذهب", "سبيكة ذهب"], "#سبائك_الذهب"),
+    (["الذهب", "ذهب", "gold"], "#الذهب"),
+]
 
 EVERGREEN_HASHTAGS = [
     "#الذهب",
     "#سعر_الذهب",
     "#أسعار_الذهب",
     "#ذهب",
-    "#عيار_21",
-    "#عيار_24",
     "#سعر_الذهب_اليوم",
     "#الذهب_في_مصر",
+    "#عيار_21",
+    "#عيار_24",
     "#Gold",
     "#GoldPrice",
 ]
@@ -66,8 +92,6 @@ def fetch_trending_queries(geo: str) -> list[str]:
     root = ET.fromstring(raw)
     titles: list[str] = []
 
-    # Google Trends RSS uses RSS item/title elements. Keep this generic enough
-    # to tolerate harmless namespace changes.
     for element in root.iter():
         if element.tag.lower().endswith("item"):
             for child in element:
@@ -92,47 +116,87 @@ def normalize_for_match(value: str) -> str:
 
 def is_relevant_trend(title: str) -> bool:
     normalized = normalize_for_match(title)
-    return any(normalize_for_match(term) in normalized for term in RELEVANCE_TERMS)
+    return any(
+        normalize_for_match(term) in normalized
+        for term in DIRECT_GOLD_TERMS
+    )
 
 
-def trend_hashtag(title: str) -> str | None:
-    cleaned = re.sub(r"[^\w\u0600-\u06FF]+", "", title, flags=re.UNICODE)
-    if not cleaned:
-        return None
-    # Keep hashtags short enough to remain readable and avoid generating
-    # machine-looking spam tags from long news headlines.
-    if len(cleaned) > 35:
-        return None
-    return "#" + cleaned
+def extract_trend_keywords(title: str) -> list[str]:
+    normalized = normalize_for_match(title)
+    keywords: list[str] = []
+
+    patterns = [
+        ("سعر الذهب", "سعر الذهب"),
+        ("اسعار الذهب", "أسعار الذهب"),
+        ("الذهب اليوم", "الذهب اليوم"),
+        ("عيار 21", "عيار 21"),
+        ("عيار 24", "عيار 24"),
+        ("عيار 22", "عيار 22"),
+        ("عيار 18", "عيار 18"),
+        ("جرام الذهب", "سعر جرام الذهب"),
+        ("الجنيه الذهب", "الجنيه الذهب"),
+        ("سبائك الذهب", "سبائك الذهب"),
+        ("سبيكة ذهب", "سبائك الذهب"),
+        ("xau", "XAU الذهب"),
+    ]
+
+    for needle, keyword in patterns:
+        if normalize_for_match(needle) in normalized and keyword not in keywords:
+            keywords.append(keyword)
+
+    return keywords
 
 
 def build_keywords(related_trends: list[str]) -> list[str]:
     keywords = CORE_KEYWORDS.copy()
 
     for trend in related_trends:
-        if len(keywords) >= 15:
+        for keyword in extract_trend_keywords(trend):
+            if keyword not in keywords:
+                keywords.append(keyword)
+            if len(keywords) >= 16:
+                break
+        if len(keywords) >= 16:
             break
-        trend_clean = trend.strip()
-        if trend_clean and trend_clean not in keywords:
-            keywords.append(trend_clean)
 
     return keywords
 
 
-def build_hashtags(related_trends: list[str]) -> list[str]:
-    hashtags = EVERGREEN_HASHTAGS.copy()
+def build_trend_hashtags(related_trends: list[str]) -> list[str]:
+    tags: list[str] = []
 
     for trend in related_trends:
-        tag = trend_hashtag(trend)
-        if tag and tag not in hashtags:
-            hashtags.insert(-2, tag)
-        if len(hashtags) >= 14:
+        normalized = normalize_for_match(trend)
+        for needles, tag in TREND_HASHTAG_RULES:
+            if any(normalize_for_match(needle) in normalized for needle in needles):
+                if tag not in tags:
+                    tags.append(tag)
+                if len(tags) >= 5:
+                    return tags
+
+    return tags
+
+
+def build_hashtags(related_trends: list[str]) -> list[str]:
+    trend_tags = build_trend_hashtags(related_trends)
+    hashtags = trend_tags.copy()
+
+    for tag in EVERGREEN_HASHTAGS:
+        if tag not in hashtags:
+            hashtags.append(tag)
+        if len(hashtags) >= 12:
             break
 
     return hashtags
 
 
-def generate_copy(data: dict, keywords: list[str], hashtags: list[str]) -> dict:
+def generate_copy(
+    data: dict,
+    keywords: list[str],
+    hashtags: list[str],
+    related_trends: list[str],
+) -> dict:
     p = data["karats"]
     currency = data["currency"]
 
@@ -140,9 +204,12 @@ def generate_copy(data: dict, keywords: list[str], hashtags: list[str]) -> dict:
         f"سعر الذهب اليوم في مصر: عيار 21 = {p['21']} {currency}"
     )
 
+    # Keep the spoken hook focused on the actual gold update.
+    # Trend context is stored separately so unrelated news never contaminates
+    # the voice script.
     hook = (
         f"{price_line} | "
-        "تابع أسعار الذهب وعيار 24 و22 و18 وتحديثات السوق أولًا بأول."
+        "عيار 24 و22 و18 وتحديثات الذهب أولًا بأول مع GoldAndRates."
     )
 
     voice_script = (
@@ -153,12 +220,20 @@ def generate_copy(data: dict, keywords: list[str], hashtags: list[str]) -> dict:
         f"عيار 18: {p['18']} {currency}."
     )
 
+    trend_section = ""
+    if related_trends:
+        trend_section = (
+            "\n\nإشارة ترند مرتبطة بالذهب اليوم: "
+            + related_trends[0]
+        )
+
     description = (
         f"{hook}\n\n"
         "أسعار الذهب اليوم، سعر جرام الذهب، عيار 21، عيار 24، "
-        "عيار 22، عيار 18، والذهب في مصر. "
-        "تابع GoldAndRates لمعرفة تحديثات الأسعار بشكل مستمر.\n\n"
-        + "الكلمات المفتاحية: "
+        "عيار 22، عيار 18، والجنيه الذهب في مصر. "
+        "تابع GoldAndRates لمعرفة تحديثات الأسعار بشكل مستمر."
+        + trend_section
+        + "\n\nالكلمات المفتاحية: "
         + "، ".join(keywords)
         + "\n\n"
         + " ".join(hashtags)
@@ -187,7 +262,6 @@ def main() -> None:
             trend_errors.append(f"{geo}: {type(exc).__name__}: {exc}")
             continue
 
-        # Preserve only relevant trend signals for potential copy use.
         for title in titles:
             if is_relevant_trend(title) and title not in trend_signals:
                 trend_signals.append(title)
@@ -196,7 +270,7 @@ def main() -> None:
     keywords = build_keywords(related_trends)
     hashtags = build_hashtags(related_trends)
 
-    copy = generate_copy(data, keywords, hashtags)
+    copy = generate_copy(data, keywords, hashtags, related_trends)
 
     payload = {
         "generatedAt": data["generatedAt"],
@@ -205,6 +279,7 @@ def main() -> None:
         "trendSource": "Google Trends Trending Now RSS",
         "trendGeos": TREND_GEOS,
         "trendSignals": related_trends,
+        "trendHashtags": build_trend_hashtags(related_trends),
         "trendFetchErrors": trend_errors,
         "keywords": keywords,
         "hashtags": hashtags,
@@ -219,6 +294,8 @@ def main() -> None:
             "currency": data["currency"],
             "keywords": keywords,
             "hashtags": hashtags,
+            "trendSignals": related_trends,
+            "trendHashtags": build_trend_hashtags(related_trends),
         },
         "generatedAtUtc": datetime.now(timezone.utc).isoformat(),
     }
