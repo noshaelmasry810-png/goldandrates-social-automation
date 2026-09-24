@@ -90,6 +90,13 @@ DIRECT_GOLD_TERMS = [
     "xau", "bullion",
 ]
 
+DIRECT_FX_TERMS = [
+    "الدولار", "سعر الدولار", "الدولار اليوم", "دولار مقابل",
+    "usd", "exchange rate", "currency", "currencies",
+    "سعر الصرف", "أسعار العملات", "الجنيه المصري", "الريال السعودي",
+    "الدرهم الإماراتي", "الدينار الكويتي",
+]
+
 TREND_RULES = [
     (["سعر الذهب", "اسعار الذهب", "أسعار الذهب"], "#سعر_الذهب"),
     (["عيار 21"], "#عيار_21"),
@@ -148,24 +155,42 @@ def normalize_for_match(value: str) -> str:
     )
 
 
-def is_relevant_trend(title: str) -> bool:
+def is_relevant_trend(title: str, kind: str) -> bool:
     normalized = normalize_for_match(title)
+    terms = DIRECT_GOLD_TERMS if kind == "gold" else DIRECT_FX_TERMS
     return any(
         normalize_for_match(term) in normalized
-        for term in DIRECT_GOLD_TERMS
+        for term in terms
     )
 
 
-def trend_hashtags(trends: list[str]) -> list[str]:
+def trend_hashtags(trends: list[str], kind: str) -> list[str]:
     out: list[str] = []
     for title in trends:
         normalized = normalize_for_match(title)
-        for needles, tag in TREND_RULES:
-            if any(normalize_for_match(n) in normalized for n in needles):
-                if tag not in out:
-                    out.append(tag)
-                if len(out) >= 5:
-                    return out
+        if kind == "currency":
+            currency_rules = [
+                (["سعر الدولار", "الدولار اليوم", "usd"], "#سعر_الدولار"),
+                (["الدولار"], "#الدولار"),
+                (["سعر الصرف", "أسعار العملات", "exchange rate"], "#أسعار_العملات"),
+                (["الجنيه المصري"], "#الجنيه_المصري"),
+                (["الريال السعودي"], "#الريال_السعودي"),
+                (["الدرهم الإماراتي"], "#الدرهم_الإماراتي"),
+                (["الدينار الكويتي"], "#الدينار_الكويتي"),
+            ]
+            for needles, tag in currency_rules:
+                if any(normalize_for_match(n) in normalized for n in needles):
+                    if tag not in out:
+                        out.append(tag)
+                    if len(out) >= 5:
+                        return out
+        else:
+            for needles, tag in TREND_RULES:
+                if any(normalize_for_match(n) in normalized for n in needles):
+                    if tag not in out:
+                        out.append(tag)
+                    if len(out) >= 5:
+                        return out
     return out
 
 
@@ -256,7 +281,7 @@ def fx_money(value: float) -> str:
 
 
 def build_hashtags(kind: str, trends: list[str]) -> list[str]:
-    tags = trend_hashtags(trends)
+    tags = trend_hashtags(trends, kind)
     pool = GOLD_EVERGREEN if kind == "gold" else FX_EVERGREEN
 
     for tag in tags + pool + BRAND_HASHTAGS:
@@ -290,18 +315,22 @@ def build_gold_content(data: dict, voice_gender: str, voice_profile: dict, trend
         "أسعار الذهب اليوم في مصر والسعودية والإمارات والكويت.",
         "في مصر، عيار 24: "
         + money(gold["EGP"]["karats"]["24"]) + " جنيه مصري، "
+        + "عيار 22: " + money(gold["EGP"]["karats"]["22"]) + " جنيه مصري، "
         + "عيار 21: " + money(gold["EGP"]["karats"]["21"]) + " جنيه مصري، "
         + "وعيار 18: " + money(gold["EGP"]["karats"]["18"]) + " جنيه مصري.",
         "في السعودية، عيار 24: "
         + money(gold["SAR"]["karats"]["24"]) + " ريال سعودي، "
+        + "عيار 22: " + money(gold["SAR"]["karats"]["22"]) + " ريال سعودي، "
         + "عيار 21: " + money(gold["SAR"]["karats"]["21"]) + " ريال سعودي، "
         + "وعيار 18: " + money(gold["SAR"]["karats"]["18"]) + " ريال سعودي.",
         "في الإمارات، عيار 24: "
         + money(gold["AED"]["karats"]["24"]) + " درهم إماراتي، "
+        + "عيار 22: " + money(gold["AED"]["karats"]["22"]) + " درهم إماراتي، "
         + "عيار 21: " + money(gold["AED"]["karats"]["21"]) + " درهم إماراتي، "
         + "وعيار 18: " + money(gold["AED"]["karats"]["18"]) + " درهم إماراتي.",
         "في الكويت، عيار 24: "
         + money(gold["KWD"]["karats"]["24"]) + " دينار كويتي، "
+        + "عيار 22: " + money(gold["KWD"]["karats"]["22"]) + " دينار كويتي، "
         + "عيار 21: " + money(gold["KWD"]["karats"]["21"]) + " دينار كويتي، "
         + "وعيار 18: " + money(gold["KWD"]["karats"]["18"]) + " دينار كويتي.",
         "للتفاصيل والتحديثات اليومية، تابع ذهب وأسعار على goldandrates.com."
@@ -421,7 +450,7 @@ def build_currency_content(data: dict, voice_gender: str, voice_profile: dict, t
     }
 
 
-def fetch_relevant_trends() -> tuple[list[str], list[str]]:
+def fetch_relevant_trends(kind: str) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     signals: list[str] = []
 
@@ -433,7 +462,7 @@ def fetch_relevant_trends() -> tuple[list[str], list[str]]:
             continue
 
         for title in titles:
-            if is_relevant_trend(title) and title not in signals:
+            if is_relevant_trend(title, kind) and title not in signals:
                 signals.append(title)
 
     return signals[:5], errors
@@ -451,7 +480,7 @@ def main() -> int:
     override = load_override()
     data = apply_overrides(data, override)
 
-    trends, trend_errors = fetch_relevant_trends()
+    trends, trend_errors = fetch_relevant_trends(kind)
     voice_gender, voice_profile = choose_daily_voice()
 
     if kind == "gold":
