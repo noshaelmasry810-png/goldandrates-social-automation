@@ -12,7 +12,7 @@ on:
           - currency
         default: gold
       override_json:
-        description: "Optional JSON price overrides. Example: {"gold":{"EGP":{"21":6200}}}"
+        description: 'Optional JSON price overrides, for example gold EGP 21K: 6200'
         required: false
         default: "{}"
       label:
@@ -29,6 +29,7 @@ jobs:
     env:
       VIDEO_TYPE: ${{ inputs.video_type }}
       OVERRIDE_JSON: ${{ inputs.override_json }}
+      REPLACEMENT_LABEL: ${{ inputs.label }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
