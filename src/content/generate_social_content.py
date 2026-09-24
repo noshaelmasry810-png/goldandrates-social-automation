@@ -313,27 +313,23 @@ def build_gold_content(data: dict, voice_gender: str, voice_profile: dict, trend
 
     voice_lines = [
         "أسعار الذهب اليوم في مصر والسعودية والإمارات والكويت.",
-        "في مصر، عيار 24: "
-        + money(gold["EGP"]["karats"]["24"]) + " جنيه مصري، "
-        + "عيار 22: " + money(gold["EGP"]["karats"]["22"]) + " جنيه مصري، "
-        + "عيار 21: " + money(gold["EGP"]["karats"]["21"]) + " جنيه مصري، "
-        + "وعيار 18: " + money(gold["EGP"]["karats"]["18"]) + " جنيه مصري.",
-        "في السعودية، عيار 24: "
-        + money(gold["SAR"]["karats"]["24"]) + " ريال سعودي، "
-        + "عيار 22: " + money(gold["SAR"]["karats"]["22"]) + " ريال سعودي، "
-        + "عيار 21: " + money(gold["SAR"]["karats"]["21"]) + " ريال سعودي، "
-        + "وعيار 18: " + money(gold["SAR"]["karats"]["18"]) + " ريال سعودي.",
-        "في الإمارات، عيار 24: "
-        + money(gold["AED"]["karats"]["24"]) + " درهم إماراتي، "
-        + "عيار 22: " + money(gold["AED"]["karats"]["22"]) + " درهم إماراتي، "
-        + "عيار 21: " + money(gold["AED"]["karats"]["21"]) + " درهم إماراتي، "
-        + "وعيار 18: " + money(gold["AED"]["karats"]["18"]) + " درهم إماراتي.",
-        "في الكويت، عيار 24: "
-        + money(gold["KWD"]["karats"]["24"]) + " دينار كويتي، "
-        + "عيار 22: " + money(gold["KWD"]["karats"]["22"]) + " دينار كويتي، "
-        + "عيار 21: " + money(gold["KWD"]["karats"]["21"]) + " دينار كويتي، "
-        + "وعيار 18: " + money(gold["KWD"]["karats"]["18"]) + " دينار كويتي.",
-        "للتفاصيل والتحديثات اليومية، تابع ذهب وأسعار على goldandrates.com."
+        "مصر: عيار 24 بـ " + money(gold["EGP"]["karats"]["24"]) + "، "
+        + "22 بـ " + money(gold["EGP"]["karats"]["22"]) + "، "
+        + "21 بـ " + money(gold["EGP"]["karats"]["21"]) + "، "
+        + "18 بـ " + money(gold["EGP"]["karats"]["18"]) + " جنيه.",
+        "السعودية: عيار 24 بـ " + money(gold["SAR"]["karats"]["24"]) + "، "
+        + "22 بـ " + money(gold["SAR"]["karats"]["22"]) + "، "
+        + "21 بـ " + money(gold["SAR"]["karats"]["21"]) + "، "
+        + "18 بـ " + money(gold["SAR"]["karats"]["18"]) + " ريال.",
+        "الإمارات: عيار 24 بـ " + money(gold["AED"]["karats"]["24"]) + "، "
+        + "22 بـ " + money(gold["AED"]["karats"]["22"]) + "، "
+        + "21 بـ " + money(gold["AED"]["karats"]["21"]) + "، "
+        + "18 بـ " + money(gold["AED"]["karats"]["18"]) + " درهم.",
+        "الكويت: عيار 24 بـ " + money(gold["KWD"]["karats"]["24"]) + "، "
+        + "22 بـ " + money(gold["KWD"]["karats"]["22"]) + "، "
+        + "21 بـ " + money(gold["KWD"]["karats"]["21"]) + "، "
+        + "18 بـ " + money(gold["KWD"]["karats"]["18"]) + " دينار.",
+        "للتفاصيل والتحديثات اليومية: ذهب وأسعار، goldandrates.com."
     ]
 
     description_parts = [
