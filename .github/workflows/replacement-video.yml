@@ -68,6 +68,11 @@ jobs:
       - name: Generate replacement video
         run: python src/video/generate_video.py
 
+      - name: Validate replacement MP4
+        run: |
+          test -s artifacts/goldandrates_${{ inputs.video_type }}_daily.mp4
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 artifacts/goldandrates_${{ inputs.video_type }}_daily.mp4
+
       - name: Write replacement metadata
         run: |
           python - <<'PY'
