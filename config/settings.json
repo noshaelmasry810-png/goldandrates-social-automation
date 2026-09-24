@@ -1,0 +1,21 @@
+{
+  "project": "GoldAndRates Social Automation",
+  "version": "1.0.0",
+  "timezone": "Africa/Cairo",
+  "currency": "EGP",
+  "priceSource": {
+    "type": "http_json",
+    "urlEnv": "GOLDANDRATES_PRICE_API_URL",
+    "timeoutMs": 15000
+  },
+  "content": {
+    "language": "ar",
+    "defaultKarat": 21,
+    "karats": [
+      24,
+      22,
+      21,
+      18
+    ]
+  }
+}
