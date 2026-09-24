@@ -1,20 +1,36 @@
-name: GoldAndRates Daily Content
+name: GoldAndRates Daily Videos
 
 on:
   workflow_dispatch:
+    inputs:
+      video_type:
+        description: "Choose which daily video to generate"
+        required: true
+        type: choice
+        options:
+          - gold
+          - currency
+          - both
+        default: gold
   schedule:
     - cron: "0 7 * * *"
+    - cron: "0 8 * * *"
 
 concurrency:
-  group: goldandrates-daily-content
+  group: goldandrates-daily-videos
   cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
-  generate:
+  gold:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 7 * * *') ||
+      (github.event_name == 'workflow_dispatch' && (inputs.video_type == 'gold' || inputs.video_type == 'both'))
     runs-on: ubuntu-latest
+    env:
+      VIDEO_TYPE: gold
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,44 +48,104 @@ jobs:
           sudo apt-get install -y ffmpeg fonts-noto-core fontconfig
           python -m pip install --upgrade edge-tts pillow arabic-reshaper python-bidi
 
-      - name: Fetch current prices
+      - name: Fetch gold markets and FX
         env:
           GOLDANDRATES_PRICE_API_URL: ${{ secrets.GOLDANDRATES_PRICE_API_URL }}
-        run: python src/prices/fetch_prices.py
+        run: python src/data/fetch_market_data.py
 
-      - name: Generate Arabic content
-        run: python src/content/generate_content.py
+      - name: Generate gold social content
+        run: python src/content/generate_social_content.py
 
-      - name: Generate daily Arabic voice
+      - name: Generate Arabic narrator
         run: python src/video/generate_voice.py
 
-      - name: Generate vertical video
+      - name: Generate 1080x1920 gold video
         run: python src/video/generate_video.py
 
-      - name: Upload video artifacts
+      - name: Upload gold video
         uses: actions/upload-artifact@v4
         with:
-          name: goldandrates-daily-video
+          name: goldandrates-gold-daily
           path: |
-            artifacts/goldandrates_daily.mp4
-            artifacts/goldandrates_voice.mp3
-            artifacts/video.json
-            artifacts/voice.json
+            artifacts/goldandrates_gold_daily.mp4
+            artifacts/goldandrates_gold_voice.mp3
+            artifacts/gold_video.json
+            artifacts/gold_voice.json
           if-no-files-found: error
           retention-days: 7
 
-      - name: Commit generated data
+      - name: Commit gold content data
         run: |
           git config user.name "GoldAndRates Automation"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add data/prices.json data/content.json
-
+          git add data/gold_content.json data/prices.json
           if git diff --cached --quiet; then
-            echo "No generated data changes to commit."
+            echo "No gold data changes to commit."
           else
-            git commit -m "chore: update daily gold content"
+            git commit -m "chore: update daily gold video data"
           fi
+          git pull --rebase origin main
+          git push
 
+  currency:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 8 * * *') ||
+      (github.event_name == 'workflow_dispatch' && (inputs.video_type == 'currency' || inputs.video_type == 'both'))
+    runs-on: ubuntu-latest
+    env:
+      VIDEO_TYPE: currency
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install video dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-core fontconfig
+          python -m pip install --upgrade edge-tts pillow arabic-reshaper python-bidi
+
+      - name: Fetch gold markets and FX
+        env:
+          GOLDANDRATES_PRICE_API_URL: ${{ secrets.GOLDANDRATES_PRICE_API_URL }}
+        run: python src/data/fetch_market_data.py
+
+      - name: Generate currency social content
+        run: python src/content/generate_social_content.py
+
+      - name: Generate Arabic narrator
+        run: python src/video/generate_voice.py
+
+      - name: Generate 1080x1920 currency video
+        run: python src/video/generate_video.py
+
+      - name: Upload currency video
+        uses: actions/upload-artifact@v4
+        with:
+          name: goldandrates-currency-daily
+          path: |
+            artifacts/goldandrates_currency_daily.mp4
+            artifacts/goldandrates_currency_voice.mp3
+            artifacts/currency_video.json
+            artifacts/currency_voice.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Commit currency content data
+        run: |
+          git config user.name "GoldAndRates Automation"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/currency_content.json
+          if git diff --cached --quiet; then
+            echo "No currency data changes to commit."
+          else
+            git commit -m "chore: update daily currency video data"
+          fi
           git pull --rebase origin main
           git push
