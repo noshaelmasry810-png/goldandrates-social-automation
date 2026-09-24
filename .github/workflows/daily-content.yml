@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: "0 7 * * *"
 
+concurrency:
+  group: goldandrates-daily-content
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -14,20 +18,34 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - name: Fetch current prices
         env:
           GOLDANDRATES_PRICE_API_URL: ${{ secrets.GOLDANDRATES_PRICE_API_URL }}
         run: python src/prices/fetch_prices.py
+
       - name: Generate Arabic content
         run: python src/content/generate_content.py
+
       - name: Commit generated data
         run: |
           git config user.name "GoldAndRates Automation"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add data/prices.json data/content.json
-          git diff --cached --quiet || git commit -m "chore: update daily gold content"
+
+          if git diff --cached --quiet; then
+            echo "No generated data changes to commit."
+          else
+            git commit -m "chore: update daily gold content"
+          fi
+
+          git pull --rebase origin main
           git push
