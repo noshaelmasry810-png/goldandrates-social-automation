@@ -1,0 +1,90 @@
+name: GoldAndRates Replacement Video
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_type:
+        description: "Video to replace"
+        required: true
+        type: choice
+        options:
+          - gold
+          - currency
+        default: gold
+      override_json:
+        description: "Optional JSON price overrides. Example: {"gold":{"EGP":{"21":6200}}}"
+        required: false
+        default: "{}"
+      label:
+        description: "Optional replacement label"
+        required: false
+        default: "manual-correction"
+
+permissions:
+  contents: read
+
+jobs:
+  replacement:
+    runs-on: ubuntu-latest
+    env:
+      VIDEO_TYPE: ${{ inputs.video_type }}
+      OVERRIDE_JSON: ${{ inputs.override_json }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install video dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-core fontconfig
+          python -m pip install --upgrade edge-tts pillow arabic-reshaper python-bidi
+
+      - name: Fetch current gold markets and FX
+        env:
+          GOLDANDRATES_PRICE_API_URL: ${{ secrets.GOLDANDRATES_PRICE_API_URL }}
+        run: python src/data/fetch_market_data.py
+
+      - name: Generate corrected social content
+        env:
+          OVERRIDE_JSON: ${{ inputs.override_json }}
+        run: python src/content/generate_social_content.py
+
+      - name: Generate corrected narrator
+        run: python src/video/generate_voice.py
+
+      - name: Generate replacement video
+        run: python src/video/generate_video.py
+
+      - name: Write replacement metadata
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path("data/gold_content.json" if os.environ["VIDEO_TYPE"] == "gold" else "data/currency_content.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          data["replacementLabel"] = os.environ.get("REPLACEMENT_LABEL", "manual-correction")
+          data["overrideJson"] = os.environ.get("OVERRIDE_JSON", "{}")
+          path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload replacement artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: goldandrates-replacement-${{ inputs.video_type }}-${{ inputs.label }}
+          path: |
+            artifacts/goldandrates_${{ inputs.video_type }}_daily.mp4
+            artifacts/goldandrates_${{ inputs.video_type }}_voice.mp3
+            artifacts/${{ inputs.video_type }}_video.json
+            artifacts/${{ inputs.video_type }}_voice.json
+            data/${{ inputs.video_type }}_content.json
+          if-no-files-found: error
+          retention-days: 7
