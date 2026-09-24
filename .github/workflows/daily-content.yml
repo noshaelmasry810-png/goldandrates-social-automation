@@ -34,6 +34,20 @@ jobs:
       - name: Generate Arabic content
         run: python src/content/generate_content.py
 
+      - name: Install voice generator
+        run: python -m pip install --upgrade edge-tts
+
+      - name: Generate daily Arabic voice
+        run: python src/video/generate_voice.py
+
+      - name: Upload voice artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: goldandrates-daily-voice
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Commit generated data
         run: |
           git config user.name "GoldAndRates Automation"
