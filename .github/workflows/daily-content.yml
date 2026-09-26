@@ -36,12 +36,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Install video dependencies
         run: |
           sudo apt-get update
@@ -51,65 +49,51 @@ jobs:
           sudo curl -fsSL https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Bold.ttf -o /usr/local/share/fonts/Tajawal-Bold.ttf
           sudo curl -fsSL https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Medium.ttf -o /usr/local/share/fonts/Tajawal-Medium.ttf
           sudo fc-cache -f
-          python -m pip install --upgrade edge-tts pillow arabic-reshaper python-bidi
-
+          python -m pip install --upgrade pillow arabic-reshaper python-bidi
       - name: Fetch gold markets and FX
         env:
           GOLDANDRATES_PRICE_API_URL: ${{ secrets.GOLDANDRATES_PRICE_API_URL }}
         run: python src/data/fetch_market_data.py
-
       - name: Generate gold social content
         run: |
           python src/content/generate_social_content.py
           python - <<'PY'
           import json
           from pathlib import Path
-          source = Path("data/social_content.json")
-          payload = json.loads(source.read_text(encoding="utf-8"))
+          payload = json.loads(Path("data/social_content.json").read_text(encoding="utf-8"))
           gold = payload.get("gold")
-          if not isinstance(gold, dict):
-              raise SystemExit("social_content.json does not contain a valid gold object")
-          Path("data/gold_content.json").write_text(
-              json.dumps(gold, ensure_ascii=False, indent=2) + "\n",
-              encoding="utf-8",
-          )
-          print("Synced fresh gold_content.json from social_content.json")
-          print("voiceSegments:", len(gold.get("voiceSegments", [])))
+          if not isinstance(gold, dict): raise SystemExit("social_content.json does not contain a valid gold object")
+          Path("data/gold_content.json").write_text(json.dumps(gold, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          print("Synced fresh gold_content.json")
           PY
-
-      - name: Generate Arabic narrator
-        run: python src/video/generate_voice.py
-
+      - name: Generate original news bulletin music
+        run: |
+          python src/video/generate_news_music.py
+          ffmpeg -y -i artifacts/news_bulletin_music.wav -c:a libmp3lame -b:a 160k artifacts/news_bulletin_music.mp3
       - name: Generate 1080x1920 gold video
         run: python src/video/generate_video.py
-
       - name: Validate gold MP4
         run: |
           test -s artifacts/goldandrates_gold_daily.mp4
-          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 artifacts/goldandrates_gold_daily.mp4
-
+          DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 artifacts/goldandrates_gold_daily.mp4)
+          python -c "d=float('$DURATION'); assert 15 <= d <= 35, f'Invalid duration: {d}'"
+          echo "Gold video duration: $DURATION seconds"
       - name: Upload gold video
         uses: actions/upload-artifact@v4
         with:
           name: goldandrates-gold-daily
           path: |
             artifacts/goldandrates_gold_daily.mp4
-            artifacts/goldandrates_gold_voice.mp3
+            artifacts/news_bulletin_music.mp3
             artifacts/gold_video.json
-            artifacts/gold_voice.json
           if-no-files-found: error
           retention-days: 7
-
       - name: Commit gold content data
         run: |
           git config user.name "GoldAndRates Automation"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/gold_content.json data/prices.json
-          if git diff --cached --quiet; then
-            echo "No gold data changes to commit."
-          else
-            git commit -m "chore: update daily gold video data"
-          fi
+          if git diff --cached --quiet; then echo "No gold data changes to commit."; else git commit -m "chore: update daily gold video data"; fi
           git pull --rebase origin main
           git push
 
@@ -125,12 +109,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Install video dependencies
         run: |
           sudo apt-get update
@@ -140,64 +122,50 @@ jobs:
           sudo curl -fsSL https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Bold.ttf -o /usr/local/share/fonts/Tajawal-Bold.ttf
           sudo curl -fsSL https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Medium.ttf -o /usr/local/share/fonts/Tajawal-Medium.ttf
           sudo fc-cache -f
-          python -m pip install --upgrade edge-tts pillow arabic-reshaper python-bidi
-
+          python -m pip install --upgrade pillow arabic-reshaper python-bidi
       - name: Fetch gold markets and FX
         env:
           GOLDANDRATES_PRICE_API_URL: ${{ secrets.GOLDANDRATES_PRICE_API_URL }}
         run: python src/data/fetch_market_data.py
-
       - name: Generate currency social content
         run: |
           python src/content/generate_social_content.py
           python - <<'PY'
           import json
           from pathlib import Path
-          source = Path("data/social_content.json")
-          payload = json.loads(source.read_text(encoding="utf-8"))
+          payload = json.loads(Path("data/social_content.json").read_text(encoding="utf-8"))
           currency = payload.get("currency")
-          if not isinstance(currency, dict):
-              raise SystemExit("social_content.json does not contain a valid currency object")
-          Path("data/currency_content.json").write_text(
-              json.dumps(currency, ensure_ascii=False, indent=2) + "\n",
-              encoding="utf-8",
-          )
-          print("Synced fresh currency_content.json from social_content.json")
-          print("voiceSegments:", len(currency.get("voiceSegments", [])))
+          if not isinstance(currency, dict): raise SystemExit("social_content.json does not contain a valid currency object")
+          Path("data/currency_content.json").write_text(json.dumps(currency, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          print("Synced fresh currency_content.json")
           PY
-
-      - name: Generate Arabic narrator
-        run: python src/video/generate_voice.py
-
+      - name: Generate original news bulletin music
+        run: |
+          python src/video/generate_news_music.py
+          ffmpeg -y -i artifacts/news_bulletin_music.wav -c:a libmp3lame -b:a 160k artifacts/news_bulletin_music.mp3
       - name: Generate 1080x1920 currency video
         run: python src/video/generate_video.py
-
       - name: Validate currency MP4
         run: |
           test -s artifacts/goldandrates_currency_daily.mp4
-          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 artifacts/goldandrates_currency_daily.mp4
-
+          DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 artifacts/goldandrates_currency_daily.mp4)
+          python -c "d=float('$DURATION'); assert 15 <= d <= 35, f'Invalid duration: {d}'"
+          echo "Currency video duration: $DURATION seconds"
       - name: Upload currency video
         uses: actions/upload-artifact@v4
         with:
           name: goldandrates-currency-daily
           path: |
             artifacts/goldandrates_currency_daily.mp4
-            artifacts/goldandrates_currency_voice.mp3
+            artifacts/news_bulletin_music.mp3
             artifacts/currency_video.json
-            artifacts/currency_voice.json
           if-no-files-found: error
           retention-days: 7
-
       - name: Commit currency content data
         run: |
           git config user.name "GoldAndRates Automation"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/currency_content.json
-          if git diff --cached --quiet; then
-            echo "No currency data changes to commit."
-          else
-            git commit -m "chore: update daily currency video data"
-          fi
+          if git diff --cached --quiet; then echo "No currency data changes to commit."; else git commit -m "chore: update daily currency video data"; fi
           git pull --rebase origin main
           git push
