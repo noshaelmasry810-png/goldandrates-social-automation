@@ -168,18 +168,17 @@ def make_intro(content):
         layer.save(p)
         layers.append((p, 0, 0, delay))
     if KIND == "gold":
-        title = "النشرة اليومية لأسعار الذهب"
         hook = "عيار 21 عامل كام النهارده؟"
-        accent = (255, 224, 116)
     else:
-        title = "النشرة اليومية لأسعار العملات"
         hook = "الدولار وصل لكام النهارده؟"
-        accent = (105, 205, 255)
-    text_layer("intro_title.png", lambda d: centered(d, title, 585, 52, True, accent), 0.25)
-    text_layer("intro_hook.png", lambda d: centered(d, hook, 735, 78, True, (255, 255, 255)), 1.00)
-    # Opening date is a real animated text element; the footer date below is fixed.
-    text_layer("intro_date.png", lambda d: centered(d, today_ar(), 1035, 42, True, (225, 229, 238)), 1.85)
-    footer(img)
+
+    # Opening order: the hook is the FIRST thing that appears.
+    # The date is directly underneath and uses the exact same FADE IN timing.
+    text_layer("intro_hook.png", lambda d: centered(d, hook, 760, 78, True, (255, 255, 255)), 0.25)
+    text_layer("intro_date.png", lambda d: centered(d, today_ar(), 870, 42, True, (225, 229, 238)), 0.25)
+
+    # No fixed footer on the intro. It appears when the video moves to the
+    # karat pages and then remains fixed until the end.
 
     p = FRAMES / "01_intro.png"
     img.convert("RGB").save(p, quality=96)
