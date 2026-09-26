@@ -20,7 +20,7 @@ FPS = 30
 WIDTH, HEIGHT = 1080, 1920
 KIND = os.environ.get("VIDEO_TYPE", "gold").strip().lower()
 CONTENT = DATA_DIR / ("gold_content.json" if KIND == "gold" else "currency_content.json")
-MUSIC = ARTIFACTS / "news_bulletin_music.mp3"
+MUSIC = ROOT / "assets" / "music" / "news_bulletin.mp3"
 OUTPUT = ARTIFACTS / f"goldandrates_{KIND}_daily.mp4"
 FONT_REGULAR = FONT_BOLD = None
 
