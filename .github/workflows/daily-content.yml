@@ -66,10 +66,10 @@ jobs:
           Path("data/gold_content.json").write_text(json.dumps(gold, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
           print("Synced fresh gold_content.json")
           PY
-      - name: Generate original news bulletin music
+      - name: Verify custom news bulletin music
         run: |
-          python src/video/generate_news_music.py
-          ffmpeg -y -i artifacts/news_bulletin_music.wav -c:a libmp3lame -b:a 160k artifacts/news_bulletin_music.mp3
+          test -s assets/music/news_bulletin.mp3
+          echo "Using custom music: assets/music/news_bulletin.mp3"
       - name: Generate 1080x1920 gold video
         run: python src/video/generate_video.py
       - name: Validate gold MP4
@@ -139,10 +139,10 @@ jobs:
           Path("data/currency_content.json").write_text(json.dumps(currency, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
           print("Synced fresh currency_content.json")
           PY
-      - name: Generate original news bulletin music
+      - name: Verify custom news bulletin music
         run: |
-          python src/video/generate_news_music.py
-          ffmpeg -y -i artifacts/news_bulletin_music.wav -c:a libmp3lame -b:a 160k artifacts/news_bulletin_music.mp3
+          test -s assets/music/news_bulletin.mp3
+          echo "Using custom music: assets/music/news_bulletin.mp3"
       - name: Generate 1080x1920 currency video
         run: python src/video/generate_video.py
       - name: Validate currency MP4
