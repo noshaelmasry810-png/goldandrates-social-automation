@@ -71,7 +71,7 @@ jobs:
           test -s assets/music/news_bulletin.mp3
           echo "Using custom music: assets/music/news_bulletin.mp3"
       - name: Generate 1080x1920 gold video
-        run: python src/video/generate_video.py
+        run: python -c "import sys; sys.path.insert(0, 'src/video'); from generate_video import main; main()"
       - name: Validate gold MP4
         run: |
           test -s artifacts/goldandrates_gold_daily.mp4
@@ -144,7 +144,7 @@ jobs:
           test -s assets/music/news_bulletin.mp3
           echo "Using custom music: assets/music/news_bulletin.mp3"
       - name: Generate 1080x1920 currency video
-        run: python src/video/generate_video.py
+        run: python -c "import sys; sys.path.insert(0, 'src/video'); from generate_video import main; main()"
       - name: Validate currency MP4
         run: |
           test -s artifacts/goldandrates_currency_daily.mp4
