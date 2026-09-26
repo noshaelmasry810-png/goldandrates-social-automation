@@ -166,16 +166,18 @@ def make_intro(content):
     centered(d, today_ar(), 1035, 42, True, (225, 229, 238))
     footer(img)
 
-    hook_layer = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
+    # Keep the animated layer tightly cropped so the scale effect grows
+    # around the hook itself instead of scaling the whole 1080x1920 canvas.
+    hook_layer = Image.new("RGBA", (980, 250), (0, 0, 0, 0))
     hd = ImageDraw.Draw(hook_layer)
     accent = (255, 224, 116) if KIND == "gold" else (105, 205, 255)
     font = fnt(102, True)
     box = hd.textbbox((0, 0), hook, font=font)
     w = box[2] - box[0]
-    x = (WIDTH - w) / 2
-    hd.rounded_rectangle((x - 34, 735, x + w + 34, 930), radius=48,
+    x = (980 - w) / 2
+    hd.rounded_rectangle((x - 34, 8, x + w + 34, 203), radius=48,
                          fill=(3, 7, 13, 205), outline=accent + (235,), width=4)
-    hd.text((x, 790), hook, font=font, fill=(255, 255, 255),
+    hd.text((x, 63), hook, font=font, fill=(255, 255, 255),
             stroke_width=2, stroke_fill=(0, 0, 0, 170))
     hook_path = FRAMES / "01_intro_hook.png"
     hook_layer.save(hook_path)
