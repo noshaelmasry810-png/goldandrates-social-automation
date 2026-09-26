@@ -38,3 +38,4 @@ jobs:
           git add src/content/generate_social_content.py
           git commit -m 'Shorten gold narration to stay within 40 seconds'
           git push
+          # trigger update 2
