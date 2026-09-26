@@ -132,9 +132,12 @@ def card(img, box, accent=(255, 224, 116), alpha=224):
 
 
 def footer(img):
+    # Fixed footer: date, site name and URL are baked into the static background
+    # and never receive animation.
     d = ImageDraw.Draw(img)
-    centered(d, "موقع ذهب وأسعار", 1765, 28, True, (245, 245, 248))
-    centered(d, "www.goldandrates.com", 1815, 34, True, (255, 224, 116))
+    centered(d, today_ar(), 1690, 30, True, (225, 229, 238))
+    centered(d, "موقع ذهب وأسعار", 1760, 28, True, (245, 245, 248))
+    centered(d, "www.goldandrates.com", 1810, 34, True, (255, 224, 116))
 
 
 def money(v):
@@ -174,13 +177,9 @@ def make_intro(content):
         accent = (105, 205, 255)
     text_layer("intro_title.png", lambda d: centered(d, title, 585, 52, True, accent), 0.25)
     text_layer("intro_hook.png", lambda d: centered(d, hook, 735, 78, True, (255, 255, 255)), 1.00)
+    # Opening date is a real animated text element; the footer date below is fixed.
     text_layer("intro_date.png", lambda d: centered(d, today_ar(), 1035, 42, True, (225, 229, 238)), 1.85)
-    # Draw footer separately because footer() needs an actual layer object.
-    footer_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    footer(footer_layer)
-    footer_path = FRAMES / "intro_footer.png"
-    footer_layer.save(footer_path)
-    layers[-1] = (footer_path, 0, 0, 2.65)
+    footer(img)
 
     p = FRAMES / "01_intro.png"
     img.convert("RGB").save(p, quality=96)
@@ -224,12 +223,6 @@ def make_gold_market_slide(item, index):
         layer.save(row_path)
         layers.append((row_path, (WIDTH - 870) // 2, 500 + n * 235, 1.45 + n * 0.75))
 
-    footer_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    footer(footer_layer)
-    footer_path = FRAMES / f"gold_{index:02d}_footer.png"
-    footer_layer.save(footer_path)
-    layers.append((footer_path, 0, 0, 4.75))
-
     p = FRAMES / f"gold_{index:02d}_base.png"
     img.convert("RGB").save(p, quality=96)
     GOLD_LAYERS[str(p)] = layers
@@ -262,6 +255,7 @@ def make_cta():
         p = FRAMES / name
         layer.save(p)
         layers.append((p, 0, 0, delay))
+    footer(img)
     p = FRAMES / "99_cta.png"
     img.convert("RGB").save(p, quality=96)
     GOLD_LAYERS[str(p)] = layers
