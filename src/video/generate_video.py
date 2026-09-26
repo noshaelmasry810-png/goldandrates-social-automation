@@ -235,7 +235,7 @@ def make_segment(image_path, duration, index):
             out = f"[v{n}]"
             filters.append(f"{current}[{n+1}:v]overlay=x='{xexpr}':y={y}:eof_action=repeat:shortest=1{out}")
             current = out
-        vf = ";".join(filters) + f";{current}zoompan=z='min(zoom+0.00030,1.045)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,fade=t=in:st=0:d=0.45,fade=t=out:st={max(0,duration-0.65):.3f}:d=0.65,format=yuv420p"
+        vf = ";".join(filters) + f";{current}zoompan=z='min(zoom+0.00030,1.045)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,fade=t=in:st=0:d=0.45,fade=t=out:st={max(0,duration-0.65):.3f}:d=0.65,format=yuv420p[vout]"
         run(["ffmpeg", "-y", *inputs, "-t", f"{duration:.3f}", "-filter_complex", vf,
              "-map", "[vout]", "-an", "-c:v", "libx264", "-preset", "veryfast",
              "-crf", "19", "-pix_fmt", "yuv420p", segment])
