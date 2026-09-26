@@ -154,19 +154,35 @@ def today_ar():
 
 
 def make_intro(content):
-    # Opening is hook + date only. Product/karat pricing appears on the next slide.
+    # Opening: the hook is the visual focus in the center, with a separate
+    # transparent layer so FFmpeg can give it a subtle "mouse-click" pop.
     img = background(); d = ImageDraw.Draw(img)
-    centered(d, today_ar(), 245, 38, True, (225, 229, 238))
     if KIND == "gold":
-        centered(d, "النشرة اليومية لأسعار الذهب", 430, 58, True, (255, 224, 116))
-        centered(d, "عيار 21 عامل كام النهارده؟", 535, 76, True, (255, 255, 255))
+        centered(d, "النشرة اليومية لأسعار الذهب", 585, 52, True, (255, 224, 116))
+        hook = "عيار 21 عامل كام النهارده؟"
     else:
-        rates = {x["code"]: x["value"] for x in content["videoData"]["rates"]}
-        centered(d, "النشرة اليومية لأسعار العملات", 430, 56, True, (105, 205, 255))
-        centered(d, "الدولار وصل لكام النهارده؟", 535, 76, True, (255, 255, 255))
+        centered(d, "النشرة اليومية لأسعار العملات", 585, 50, True, (105, 205, 255))
+        hook = "الدولار وصل لكام النهارده؟"
+    centered(d, today_ar(), 1035, 42, True, (225, 229, 238))
     footer(img)
-    p = FRAMES / "01_intro.png"; img.convert("RGB").save(p, quality=96); return p
 
+    hook_layer = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
+    hd = ImageDraw.Draw(hook_layer)
+    accent = (255, 224, 116) if KIND == "gold" else (105, 205, 255)
+    font = fnt(102, True)
+    box = hd.textbbox((0, 0), hook, font=font)
+    w = box[2] - box[0]
+    x = (WIDTH - w) / 2
+    hd.rounded_rectangle((x - 34, 735, x + w + 34, 930), radius=48,
+                         fill=(3, 7, 13, 205), outline=accent + (235,), width=4)
+    hd.text((x, 790), hook, font=font, fill=(255, 255, 255),
+            stroke_width=2, stroke_fill=(0, 0, 0, 170))
+    hook_path = FRAMES / "01_intro_hook.png"
+    hook_layer.save(hook_path)
+
+    p = FRAMES / "01_intro.png"
+    img.convert("RGB").save(p, quality=96)
+    return p
 
 def make_gold_market_slide(item, index):
     # Build a clean base plus four transparent, independently animated price cards.
@@ -219,7 +235,7 @@ def make_cta():
 def make_segment(image_path, duration, index):
     segment = ARTIFACTS / f"{KIND}_segment_{index:02d}.mp4"
     if KIND == "gold" and Path(image_path).name.endswith("_base.png"):
-        # Animate each karat card independently: slide in from the right with staggered timing.
+        # Click/tap style: every card stays centered and pops in place.
         stem = Path(image_path).stem
         inputs = ["-loop", "1", "-i", image_path]
         for n in range(4):
@@ -227,16 +243,43 @@ def make_segment(image_path, duration, index):
         filters = []
         current = "[0:v]"
         for n in range(4):
-            delay = 0.35 + n * 0.42
-            speed = 900.0
-            target_x = 105.0
-            y = 500 + n * 235
-            xexpr = f"if(lt(t,{delay:.2f}),1080,max({target_x:.0f},1080-(t-{delay:.2f})*{speed:.0f}))"
+            delay = 0.30 + n * 0.48
             out = f"[v{n}]"
-            filters.append(f"{current}[{n+1}:v]overlay=x='{xexpr}':y={y}:eof_action=repeat:shortest=1{out}")
+            scale_expr = (
+                f"if(lt(t,{delay:.2f}),0.88,"
+                f"if(lt(t,{delay+0.12:.2f}),"
+                f"0.88+0.18*(t-{delay:.2f})/0.12,"
+                f"if(lt(t,{delay+0.22:.2f}),"
+                f"1.06-0.06*(t-{delay+0.12:.2f})/0.10,1)))"
+            )
+            alpha_expr = f"if(lt(t,{delay:.2f}),0,if(lt(t,{delay+0.10:.2f}),(t-{delay:.2f})/0.10,1))"
+            scaled = f"[s{n}]"
+            filters.append(
+                f"[{n+1}:v]scale=w='870*{scale_expr}':h='210*{scale_expr}':eval=frame,"
+                f"format=rgba,colorchannelmixer=aa='{alpha_expr}'{scaled}"
+            )
+            filters.append(
+                f"{current}{scaled}overlay=x='(W-w)/2':y='{605+n*235}':eof_action=repeat:shortest=1{out}"
+            )
             current = out
-        vf = ";".join(filters) + f";{current}zoompan=z='min(zoom+0.00030,1.045)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,fade=t=in:st=0:d=0.45,fade=t=out:st={max(0,duration-0.65):.3f}:d=0.65,format=yuv420p[vout]"
+        vf = ";".join(filters) + f";{current}zoompan=z='min(zoom+0.00025,1.035)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,fade=t=in:st=0:d=0.40,fade=t=out:st={max(0,duration-0.65):.3f}:d=0.65,format=yuv420p[vout]"
         run(["ffmpeg", "-y", *inputs, "-t", f"{duration:.3f}", "-filter_complex", vf,
+             "-map", "[vout]", "-an", "-c:v", "libx264", "-preset", "veryfast",
+             "-crf", "19", "-pix_fmt", "yuv420p", segment])
+    elif Path(image_path).name == "01_intro.png":
+        # The hook gets the same click-pop language: scale up quickly and settle.
+        inputs = ["-loop", "1", "-i", image_path, "-loop", "1", "-i", FRAMES / "01_intro_hook.png"]
+        hook = (
+            "[1:v]format=rgba,"
+            "scale=w='iw*(0.88+0.18*sin(min(max(t,0),0.34)/0.34*PI/2))':"
+            "h='ih*(0.88+0.18*sin(min(max(t,0),0.34)/0.34*PI/2))':eval=frame[hook]"
+        )
+        vf = (
+            "[0:v][hook]overlay=x='(W-w)/2':y='(H-h)/2':eof_action=repeat:shortest=1,"
+            f"zoompan=z='min(zoom+0.00022,1.028)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,"
+            f"fade=t=in:st=0:d=0.40,fade=t=out:st={max(0,duration-0.65):.3f}:d=0.65,format=yuv420p[vout]"
+        )
+        run(["ffmpeg", "-y", *inputs, "-t", f"{duration:.3f}", "-filter_complex", hook + ";" + vf,
              "-map", "[vout]", "-an", "-c:v", "libx264", "-preset", "veryfast",
              "-crf", "19", "-pix_fmt", "yuv420p", segment])
     else:
