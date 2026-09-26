@@ -1,0 +1,2 @@
+# Auto-generated from the official goldandrates logo supplied for video branding.
+LOGO_PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAWgAAAE5CAYAAAC9N7qHAAEAAElEQVR42uy9d7xdVbU9PuZaa5fTbr/JTU8gEJKQ0KUTIk0RRZHE'
