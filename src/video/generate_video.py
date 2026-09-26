@@ -57,8 +57,6 @@ def centered(draw, text, y, size, bold=True, fill=(255, 255, 255)):
 def logo_image():
     raw = base64.b64decode(LOGO_PNG_B64)
     logo = Image.open(io.BytesIO(raw)).convert("RGBA")
-    # Keep the supplied logo modest in size because the embedded source is small;
-    # a small crisp logo looks better than enlarging a low-resolution raster.
     target_w = 155
     target_h = max(1, int(logo.height * target_w / logo.width))
     logo = logo.resize((target_w, target_h), Image.Resampling.LANCZOS)
@@ -78,8 +76,6 @@ def add_brand(img):
 
 
 def procedural_background():
-    # Premium fallback that preserves the intended gold/financial identity even if
-    # the external PNG assets are not present in the repository.
     base = Image.new("RGB", (WIDTH, HEIGHT))
     px = base.load()
     for y in range(HEIGHT):
@@ -92,12 +88,10 @@ def procedural_background():
                 glow = max(0.0, 1.0 - math.hypot(nx - 0.55, ny - 0.35) * 1.45)
                 px[x, y] = (int(5 + 7 * glow), int(15 + 28 * glow), int(32 + 70 * glow))
     d = ImageDraw.Draw(base, "RGBA")
-    # financial grid / diagonal market lines
     for i in range(-HEIGHT, WIDTH, 90):
         d.line((i, HEIGHT, i + HEIGHT, 0), fill=(255, 224, 116, 28) if KIND == "gold" else (110, 190, 255, 30), width=2)
     for y in range(180, HEIGHT, 140):
         d.line((0, y, WIDTH, y), fill=(255, 255, 255, 16), width=1)
-    # glowing market line
     pts = []
     for x in range(0, WIDTH + 1, 30):
         yy = int(1040 - 190 * math.sin(x / 115.0) - 75 * math.sin(x / 41.0))
@@ -118,7 +112,6 @@ def background():
         img = source.convert("RGBA")
     else:
         img = procedural_background()
-    # Dark veil keeps the news graphics readable while leaving the artwork visible.
     img.alpha_composite(Image.new("RGBA", img.size, (0, 0, 0, 92)))
     add_brand(img)
     return img
@@ -132,8 +125,6 @@ def card(img, box, accent=(255, 224, 116), alpha=224):
 
 
 def footer(img):
-    # Fixed footer: date, site name and URL are baked into the static background
-    # and never receive animation.
     d = ImageDraw.Draw(img)
     centered(d, today_ar(), 1690, 30, True, (225, 229, 238))
     centered(d, "موقع ذهب وأسعار", 1760, 28, True, (245, 245, 248))
@@ -158,7 +149,6 @@ def today_ar():
 
 
 def make_intro(content):
-    # Static background; only each text element fades in independently.
     img = background()
     layers = []
     def text_layer(name, draw_fn, delay):
@@ -167,41 +157,26 @@ def make_intro(content):
         p = FRAMES / name
         layer.save(p)
         layers.append((p, 0, 0, delay))
-    if KIND == "gold":
-        hook = "أسعار الذهب اليوم"
-    else:
-        hook = "الدولار وصل لكام النهارده؟"
-
-    # Opening order: the hook is the FIRST thing that appears.
-    # The date is directly underneath and uses the exact same FADE IN timing.
+    hook = "أسعار الذهب اليوم" if KIND == "gold" else "أسعار العملات اليوم"
     text_layer("intro_hook.png", lambda d: centered(d, hook, 760, 78, True, (255, 255, 255)), 0.25)
     text_layer("intro_date.png", lambda d: centered(d, today_ar(), 870, 42, True, (225, 229, 238)), 0.25)
-
-    # No fixed footer on the intro. It appears when the video moves to the
-    # karat pages and then remains fixed until the end.
-
     p = FRAMES / "01_intro.png"
     img.convert("RGB").save(p, quality=96)
     GOLD_LAYERS[str(p)] = layers
     return p
 
+
 def make_gold_market_slide(item, index):
-    # Static background; country title, subtitle, each price card and footer fade independently.
     img = background()
     layers = []
-
     def full_text(name, draw_fn, delay):
         layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
         draw_fn(ImageDraw.Draw(layer))
         p = FRAMES / name
         layer.save(p)
         layers.append((p, 0, 0, delay))
-
-    full_text(f"gold_{index:02d}_title.png",
-              lambda d: centered(d, item["name"], 270, 58, True, (255, 224, 116)), 0.25)
-    full_text(f"gold_{index:02d}_subtitle.png",
-              lambda d: centered(d, "أسعار الجرام اليوم", 360, 38, True, (224, 227, 235)), 0.25)
-
+    full_text(f"gold_{index:02d}_title.png", lambda d: centered(d, item["name"], 270, 58, True, (255, 224, 116)), 0.25)
+    full_text(f"gold_{index:02d}_subtitle.png", lambda d: centered(d, "أسعار الجرام اليوم", 360, 38, True, (224, 227, 235)), 0.25)
     for n, karat in enumerate(("24", "22", "21", "18")):
         layer = Image.new("RGBA", (870, 210), (0, 0, 0, 0))
         ld = ImageDraw.Draw(layer)
@@ -214,42 +189,46 @@ def make_gold_market_slide(item, index):
         def local_center(text, y, size, fill):
             font = fnt(size, True)
             box = ld.textbbox((0, 0), str(text), font=font)
-            ld.text(((870 - (box[2]-box[0]))/2, y), str(text), font=font, fill=fill,
-                    stroke_width=1, stroke_fill=(0, 0, 0, 120))
+            ld.text(((870 - (box[2]-box[0]))/2, y), str(text), font=font, fill=fill, stroke_width=1, stroke_fill=(0, 0, 0, 120))
         local_center(f"عيار {karat}", 25, 42, (244, 245, 248))
         local_center(f"{money(item['karats'][karat])} {item['unit']}", 92, 58, accent)
         row_path = FRAMES / f"gold_{index:02d}_row_{n}.png"
         layer.save(row_path)
         layers.append((row_path, (WIDTH - 870) // 2, 500 + n * 235, 0.25))
-
-    # Fixed footer: date, site name and URL are baked into the slide background.
     footer(img)
     p = FRAMES / f"gold_{index:02d}_base.png"
     img.convert("RGB").save(p, quality=96)
     GOLD_LAYERS[str(p)] = layers
     return p
 
+
 def make_currency_slide(item, index):
-    img = background(); d = ImageDraw.Draw(img)
-    centered(d, item["name"], 500, 58, True, (105, 205, 255))
+    # Currency page: static background/footer; all page content fades in together.
+    img = background()
+    layers = []
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    accent = (105, 205, 255)
+    centered(d, item["name"], 500, 58, True, accent)
     centered(d, "مقابل دولار أمريكي واحد", 625, 40, True, (224, 227, 235))
-    card(img, (105, 755, 975, 1220), accent=(105, 205, 255))
-    centered(d, fx_money(item["value"]), 855, 112, True, (105, 205, 255))
+    d.rounded_rectangle((105, 755, 975, 1220), radius=36, fill=(4, 8, 16, 224), outline=accent + (225,), width=3)
+    centered(d, fx_money(item["value"]), 855, 112, True, accent)
     centered(d, item["unit"], 1010, 48, True, (244, 245, 248))
+    content_path = FRAMES / f"fx_{index:02d}_content.png"
+    layer.save(content_path)
+    layers.append((content_path, 0, 0, 0.25))
     footer(img)
-    p = FRAMES / f"fx_{index:02d}.png"; img.convert("RGB").save(p, quality=96); return p
+    p = FRAMES / f"fx_{index:02d}_base.png"
+    img.convert("RGB").save(p, quality=96)
+    GOLD_LAYERS[str(p)] = layers
+    return p
 
 
 def make_cta():
     img = background()
     layers = []
     accent = (255, 224, 116) if KIND == "gold" else (105, 205, 255)
-    specs = [
-        ("cta_1.png", "كل الأسعار بتتحدث أول بأول", 520, 56, (245, 246, 249), 0.25),
-        ("cta_2.png", "تابع النشرة اليومية", 640, 76, accent, 1.05),
-        ("cta_3.png", "وزور موقع ذهب وأسعار", 785, 54, (245, 246, 249), 1.85),
-        ("cta_4.png", "www.goldandrates.com", 900, 60, accent, 2.65),
-    ]
+    specs = [("cta_1.png", "كل الأسعار بتتحدث أول بأول", 520, 56, (245, 246, 249), 0.25), ("cta_2.png", "تابع النشرة اليومية", 640, 76, accent, 1.05), ("cta_3.png", "وزور موقع ذهب وأسعار", 785, 54, (245, 246, 249), 1.85), ("cta_4.png", "www.goldandrates.com", 900, 60, accent, 2.65)]
     for name, text_value, y, size, fill, delay in specs:
         layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
         centered(ImageDraw.Draw(layer), text_value, y, size, True, fill)
@@ -262,51 +241,32 @@ def make_cta():
     GOLD_LAYERS[str(p)] = layers
     return p
 
+
 def make_segment(image_path, duration, index):
     segment = ARTIFACTS / f"{KIND}_segment_{index:02d}.mp4"
-
-    # Gold uses a truly static background. Each text/card layer gets its own
-    # independent alpha FADE IN; no slide, zoom, click or background animation.
-    layers = GOLD_LAYERS.get(str(image_path)) if KIND == "gold" else None
+    layers = GOLD_LAYERS.get(str(image_path))
     if not layers:
-        vf = "fade=t=in:st=0:d=0.65,format=yuv420p"
-        run([
-            "ffmpeg", "-y", "-loop", "1", "-i", image_path,
-            "-t", f"{duration:.3f}", "-vf", vf, "-an",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "19",
-            "-pix_fmt", "yuv420p", segment
-        ])
+        vf = "format=yuv420p"
+        run(["ffmpeg", "-y", "-loop", "1", "-i", image_path, "-t", f"{duration:.3f}", "-vf", vf, "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p", segment])
     else:
         cmd = ["ffmpeg", "-y", "-loop", "1", "-i", image_path]
         for layer_path, _, _, _ in layers:
             cmd += ["-loop", "1", "-i", layer_path]
-
         filters = []
         previous = "[0:v]"
         for i, (layer_path, x, y, delay) in enumerate(layers):
             label = f"l{i}"
             out = f"v{i}"
-            filters.append(
-                f"[{i+1}:v]format=rgba,fade=t=in:st={delay:.2f}:d=0.55:alpha=1[{label}]"
-            )
-            filters.append(
-                f"{previous}[{label}]overlay=x={x}:y={y}:eof_action=repeat[{out}]"
-            )
+            filters.append(f"[{i+1}:v]format=rgba,fade=t=in:st={delay:.2f}:d=0.55:alpha=1[{label}]")
+            filters.append(f"{previous}[{label}]overlay=x={x}:y={y}:eof_action=repeat[{out}]")
             previous = f"[{out}]"
         filters.append(f"{previous}format=yuv420p[vout]")
-
-        cmd += [
-            "-t", f"{duration:.3f}",
-            "-filter_complex", ";".join(filters),
-            "-map", "[vout]", "-an",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "19",
-            "-pix_fmt", "yuv420p", segment
-        ]
+        cmd += ["-t", f"{duration:.3f}", "-filter_complex", ";".join(filters), "-map", "[vout]", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p", segment]
         run(cmd)
-
     if not segment.exists() or segment.stat().st_size == 0:
         raise RuntimeError(f"Video segment was not created: {segment}")
     return segment
+
 
 def concat_segments(segments):
     list_file = ARTIFACTS / f"{KIND}_segments.txt"
@@ -317,50 +277,10 @@ def concat_segments(segments):
 
 
 def mux_music(video_path, duration):
-    run([
-        "ffmpeg", "-y", "-i", video_path, "-stream_loop", "-1", "-i", MUSIC,
-        "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0",
-        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
-        "-af", "volume=0.90,loudnorm=I=-13:TP=-1.2:LRA=7,afade=t=in:st=0:d=0.35,afade=t=out:st=" + f"{max(0,duration-1.1):.3f}:d=1.1",
-        "-shortest", OUTPUT,
-    ])
+    run(["ffmpeg", "-y", "-i", video_path, "-stream_loop", "-1", "-i", MUSIC, "-t", f"{duration:.3f}", "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-af", "volume=0.90,loudnorm=I=-13:TP=-1.2:LRA=7,afade=t=in:st=0:d=0.35,afade=t=out:st=" + f"{max(0,duration-1.1):.3f}:d=1.1", "-shortest", OUTPUT])
     if not OUTPUT.exists() or OUTPUT.stat().st_size == 0:
         raise RuntimeError(f"Final MP4 was not created: {OUTPUT}")
     streams = subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "csv=p=0", str(OUTPUT)], text=True).strip()
     if not streams:
         raise RuntimeError("Final MP4 has no audio stream")
     print(f"Verified audio stream: {streams}", flush=True)
-
-
-def main():
-    global FONT_REGULAR, FONT_BOLD
-    if KIND not in {"gold", "currency"}:
-        raise SystemExit("VIDEO_TYPE must be gold or currency")
-    for tool in ("ffmpeg", "ffprobe"):
-        if shutil.which(tool) is None:
-            raise SystemExit(f"{tool} is required")
-    if not CONTENT.exists(): raise SystemExit(f"{CONTENT} not found")
-    if not MUSIC.exists(): raise SystemExit(f"{MUSIC} not found")
-    FONT_REGULAR, FONT_BOLD = font_path(False), font_path(True)
-    content = json.loads(CONTENT.read_text(encoding="utf-8"))
-    FRAMES.mkdir(parents=True, exist_ok=True)
-    for p in ARTIFACTS.glob(f"{KIND}_segment_*.mp4"): p.unlink(missing_ok=True)
-    OUTPUT.unlink(missing_ok=True)
-    slides = [make_intro(content)]
-    if KIND == "gold":
-        slides.extend(make_gold_market_slide(item, i) for i, item in enumerate(content["videoData"]["markets"], 1))
-    else:
-        slides.extend(make_currency_slide(item, i) for i, item in enumerate(content["videoData"]["rates"], 1))
-    slides.append(make_cta())
-    durations = [6.67] * len(slides)
-    total = sum(durations)
-    if not 39.5 <= total <= 40.5:
-        raise SystemExit(f"Video duration {total:.2f}s is outside the 40s target")
-    segments = [make_segment(slides[i], durations[i], i + 1) for i in range(len(slides))]
-    silent = concat_segments(segments)
-    mux_music(silent, total)
-    print(f"Final {KIND} bulletin duration: {total:.2f}s", flush=True)
-    print(f"Final MP4: {OUTPUT}", flush=True)
-
-if __name__ == "__main__":
-    main()
