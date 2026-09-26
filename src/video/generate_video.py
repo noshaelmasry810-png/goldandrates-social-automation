@@ -168,7 +168,7 @@ def make_intro(content):
         layer.save(p)
         layers.append((p, 0, 0, delay))
     if KIND == "gold":
-        hook = "عيار 21 عامل كام النهارده؟"
+        hook = "أسعار الذهب اليوم"
     else:
         hook = "الدولار وصل لكام النهارده؟"
 
@@ -200,7 +200,7 @@ def make_gold_market_slide(item, index):
     full_text(f"gold_{index:02d}_title.png",
               lambda d: centered(d, item["name"], 270, 58, True, (255, 224, 116)), 0.25)
     full_text(f"gold_{index:02d}_subtitle.png",
-              lambda d: centered(d, "أسعار الجرام اليوم", 360, 38, True, (224, 227, 235)), 0.85)
+              lambda d: centered(d, "أسعار الجرام اليوم", 360, 38, True, (224, 227, 235)), 0.25)
 
     for n, karat in enumerate(("24", "22", "21", "18")):
         layer = Image.new("RGBA", (870, 210), (0, 0, 0, 0))
@@ -220,7 +220,7 @@ def make_gold_market_slide(item, index):
         local_center(f"{money(item['karats'][karat])} {item['unit']}", 92, 58, accent)
         row_path = FRAMES / f"gold_{index:02d}_row_{n}.png"
         layer.save(row_path)
-        layers.append((row_path, (WIDTH - 870) // 2, 500 + n * 235, 1.45 + n * 0.75))
+        layers.append((row_path, (WIDTH - 870) // 2, 500 + n * 235, 0.25))
 
     p = FRAMES / f"gold_{index:02d}_base.png"
     img.convert("RGB").save(p, quality=96)
