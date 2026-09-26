@@ -59,7 +59,23 @@ jobs:
         run: python src/data/fetch_market_data.py
 
       - name: Generate gold social content
-        run: python src/content/generate_social_content.py
+        run: |
+          python src/content/generate_social_content.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          source = Path("data/social_content.json")
+          payload = json.loads(source.read_text(encoding="utf-8"))
+          gold = payload.get("gold")
+          if not isinstance(gold, dict):
+              raise SystemExit("social_content.json does not contain a valid gold object")
+          Path("data/gold_content.json").write_text(
+              json.dumps(gold, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print("Synced fresh gold_content.json from social_content.json")
+          print("voiceSegments:", len(gold.get("voiceSegments", [])))
+          PY
 
       - name: Generate Arabic narrator
         run: python src/video/generate_voice.py
@@ -132,7 +148,23 @@ jobs:
         run: python src/data/fetch_market_data.py
 
       - name: Generate currency social content
-        run: python src/content/generate_social_content.py
+        run: |
+          python src/content/generate_social_content.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          source = Path("data/social_content.json")
+          payload = json.loads(source.read_text(encoding="utf-8"))
+          currency = payload.get("currency")
+          if not isinstance(currency, dict):
+              raise SystemExit("social_content.json does not contain a valid currency object")
+          Path("data/currency_content.json").write_text(
+              json.dumps(currency, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print("Synced fresh currency_content.json from social_content.json")
+          print("voiceSegments:", len(currency.get("voiceSegments", [])))
+          PY
 
       - name: Generate Arabic narrator
         run: python src/video/generate_voice.py
