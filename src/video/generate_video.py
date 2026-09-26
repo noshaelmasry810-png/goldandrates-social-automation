@@ -154,39 +154,46 @@ def today_ar():
 
 
 def make_intro(content):
+    # Opening is hook + date only. Product/karat pricing appears on the next slide.
     img = background(); d = ImageDraw.Draw(img)
-    centered(d, today_ar(), 250, 38, True, (225, 229, 238))
+    centered(d, today_ar(), 245, 38, True, (225, 229, 238))
     if KIND == "gold":
-        market = content["videoData"]["markets"][0]
         centered(d, "النشرة اليومية لأسعار الذهب", 430, 58, True, (255, 224, 116))
-        centered(d, "عيار 21 عامل كام النهارده؟", 525, 70, True, (255, 255, 255))
-        card(img, (105, 700, 975, 1190))
-        centered(d, "عيار 21 في مصر", 770, 48, True, (225, 228, 236))
-        centered(d, f"{money(market['karats']['21'])} جنيه", 885, 112, True, (255, 224, 116))
+        centered(d, "عيار 21 عامل كام النهارده؟", 535, 76, True, (255, 255, 255))
     else:
         rates = {x["code"]: x["value"] for x in content["videoData"]["rates"]}
         centered(d, "النشرة اليومية لأسعار العملات", 430, 56, True, (105, 205, 255))
-        centered(d, "الدولار وصل لكام النهارده؟", 525, 70, True, (255, 255, 255))
-        card(img, (105, 700, 975, 1190), accent=(105, 205, 255))
-        centered(d, "الدولار مقابل الجنيه", 770, 48, True, (225, 228, 236))
-        centered(d, f"{fx_money(rates['EGP'])} جنيه", 885, 108, True, (105, 205, 255))
+        centered(d, "الدولار وصل لكام النهارده؟", 535, 76, True, (255, 255, 255))
     footer(img)
     p = FRAMES / "01_intro.png"; img.convert("RGB").save(p, quality=96); return p
 
 
 def make_gold_market_slide(item, index):
+    # Build a clean base plus four transparent, independently animated price cards.
     img = background(); d = ImageDraw.Draw(img)
     centered(d, item["name"], 270, 58, True, (255, 224, 116))
     centered(d, "أسعار الجرام اليوم", 360, 38, True, (224, 227, 235))
-    y = 500
-    for karat in ("24", "22", "21", "18"):
-        card(img, (105, y, 975, y + 210))
-        centered(d, f"عيار {karat}", y + 25, 42, True, (244, 245, 248))
-        centered(d, f"{money(item['karats'][karat])} {item['unit']}", y + 92, 58, True, (255, 224, 116))
-        y += 235
+    y0 = 500
+    for n, karat in enumerate(("24", "22", "21", "18")):
+        layer = Image.new("RGBA", (870, 210), (0, 0, 0, 0))
+        ld = ImageDraw.Draw(layer)
+        accent = (255, 224, 116)
+        if karat == "21":
+            ld.rounded_rectangle((0, 0, 870, 210), radius=36, fill=(8, 12, 20, 238), outline=accent + (255,), width=4)
+            ld.rounded_rectangle((8, 8, 862, 202), radius=30, outline=(255, 244, 180, 115), width=2)
+        else:
+            ld.rounded_rectangle((0, 0, 870, 210), radius=36, fill=(4, 8, 16, 224), outline=accent + (225,), width=3)
+        def local_center(text, y, size, fill):
+            font = fnt(size, True)
+            box = ld.textbbox((0, 0), str(text), font=font)
+            ld.text(((870 - (box[2]-box[0]))/2, y), str(text), font=font, fill=fill,
+                    stroke_width=1, stroke_fill=(0, 0, 0, 120))
+        local_center(f"عيار {karat}", 25, 42, (244, 245, 248))
+        local_center(f"{money(item['karats'][karat])} {item['unit']}", 92, 58, accent)
+        row_path = FRAMES / f"gold_{index:02d}_row_{n}.png"
+        layer.save(row_path)
     footer(img)
-    p = FRAMES / f"gold_{index:02d}.png"; img.convert("RGB").save(p, quality=96); return p
-
+    p = FRAMES / f"gold_{index:02d}_base.png"; img.convert("RGB").save(p, quality=96); return p
 
 def make_currency_slide(item, index):
     img = background(); d = ImageDraw.Draw(img)
@@ -211,16 +218,37 @@ def make_cta():
 
 def make_segment(image_path, duration, index):
     segment = ARTIFACTS / f"{KIND}_segment_{index:02d}.mp4"
-    start_zoom = 1.0 + (0.008 * (index % 2))
-    vf = (
-        f"zoompan=z='min(zoom+0.00038,1.055)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
-        f"d=1:s=1080x1920:fps=30,fade=t=in:st=0:d=0.55,fade=t=out:st={max(0,duration-0.65):.3f}:d=0.65,format=yuv420p"
-    )
-    run(["ffmpeg", "-y", "-loop", "1", "-i", image_path, "-t", f"{duration:.3f}", "-vf", vf, "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p", segment])
+    if KIND == "gold" and Path(image_path).name.endswith("_base.png"):
+        # Animate each karat card independently: slide in from the right with staggered timing.
+        stem = Path(image_path).stem
+        inputs = ["-loop", "1", "-i", image_path]
+        for n in range(4):
+            inputs += ["-loop", "1", "-i", FRAMES / f"{stem.replace('_base','')}_row_{n}.png"]
+        filters = []
+        current = "[0:v]"
+        for n in range(4):
+            delay = 0.35 + n * 0.42
+            speed = 900.0
+            target_x = 105.0
+            y = 500 + n * 235
+            xexpr = f"if(lt(t,{delay:.2f}),1080,max({target_x:.0f},1080-(t-{delay:.2f})*{speed:.0f}))"
+            out = f"[v{n}]"
+            filters.append(f"{current}[{n+1}:v]overlay=x='{xexpr}':y={y}:eof_action=repeat:shortest=1{out}")
+            current = out
+        vf = ";".join(filters) + f";{current}zoompan=z='min(zoom+0.00030,1.045)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,fade=t=in:st=0:d=0.45,fade=t=out:st={max(0,duration-0.65):.3f}:d=0.65,format=yuv420p"
+        run(["ffmpeg", "-y", *inputs, "-t", f"{duration:.3f}", "-filter_complex", vf,
+             "-map", current.strip("[]"), "-an", "-c:v", "libx264", "-preset", "veryfast",
+             "-crf", "19", "-pix_fmt", "yuv420p", segment])
+    else:
+        vf = (
+            f"zoompan=z='min(zoom+0.00038,1.055)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
+            f"d=1:s=1080x1920:fps=30,fade=t=in:st=0:d=0.55,fade=t=out:st={max(0,duration-0.65):.3f}:d=0.65,format=yuv420p"
+        )
+        run(["ffmpeg", "-y", "-loop", "1", "-i", image_path, "-t", f"{duration:.3f}", "-vf", vf, "-an",
+             "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p", segment])
     if not segment.exists() or segment.stat().st_size == 0:
         raise RuntimeError(f"Video segment was not created: {segment}")
     return segment
-
 
 def concat_segments(segments):
     list_file = ARTIFACTS / f"{KIND}_segments.txt"
