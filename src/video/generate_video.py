@@ -254,14 +254,14 @@ def make_segment(image_path, duration, index):
                 f"if(lt(t,{delay+0.22:.2f}),"
                 f"1.06-0.06*(t-{delay+0.12:.2f})/0.10,1)))"
             )
-            alpha_expr = f"if(lt(t,{delay:.2f}),0,if(lt(t,{delay+0.10:.2f}),(t-{delay:.2f})/0.10,1))"
             scaled = f"[s{n}]"
             filters.append(
                 f"[{n+1}:v]scale=w='870*{scale_expr}':h='210*{scale_expr}':eval=frame,"
-                f"format=rgba,colorchannelmixer=aa='{alpha_expr}'{scaled}"
+                f"format=rgba{scaled}"
             )
             filters.append(
-                f"{current}{scaled}overlay=x='(W-w)/2':y='{605+n*235}':eof_action=repeat:shortest=1{out}"
+                f"{current}{scaled}overlay=x='(W-w)/2':y='{605+n*235}':"
+                f"enable='gte(t,{delay:.2f})':eof_action=repeat:shortest=1{out}"
             )
             current = out
         vf = ";".join(filters) + f";{current}zoompan=z='min(zoom+0.00025,1.035)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,fade=t=in:st=0:d=0.40,fade=t=out:st={max(0,duration-0.65):.3f}:d=0.65,format=yuv420p[vout]"
