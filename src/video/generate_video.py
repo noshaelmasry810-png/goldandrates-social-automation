@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data"
 ARTIFACTS = ROOT / "artifacts"
 FRAMES = ARTIFACTS / "frames"
+BACKGROUND_DIR = ROOT / "assets" / "backgrounds"
 
 FPS = 30
 WIDTH = 1080
@@ -45,30 +46,21 @@ def run(command: list[str]) -> None:
 
 def find_font(bold: bool = False) -> str:
     candidates = [
-        "/usr/local/share/fonts/Tajawal-Bold.ttf"
-        if bold else "/usr/local/share/fonts/Tajawal-Regular.ttf",
-        "/usr/share/fonts/truetype/tajawal/Tajawal-Bold.ttf"
-        if bold else "/usr/share/fonts/truetype/tajawal/Tajawal-Regular.ttf",
-        "/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf"
-        if bold else "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf",
-        "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Bold.ttf"
-        if bold else "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/local/share/fonts/Tajawal-Bold.ttf" if bold else "/usr/local/share/fonts/Tajawal-Regular.ttf",
+        "/usr/share/fonts/truetype/tajawal/Tajawal-Bold.ttf" if bold else "/usr/share/fonts/truetype/tajawal/Tajawal-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf" if bold else "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Bold.ttf" if bold else "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     ]
     for path in candidates:
         if Path(path).exists():
             return path
 
     style = "Bold" if bold else "Regular"
-    result = subprocess.check_output(
-        ["fc-match", f"Tajawal:style={style}"],
-        text=True,
-    ).strip()
+    result = subprocess.check_output(["fc-match", f"Tajawal:style={style}"], text=True).strip()
     path = result.split(":", 1)[0].strip()
     if Path(path).exists():
         return path
-
     raise FileNotFoundError("No Arabic-capable font was found")
 
 
@@ -78,40 +70,19 @@ def normalize_text(value: str) -> str:
         return text
     if arabic_reshaper and get_display:
         return get_display(arabic_reshaper.reshape(text))
-    raise RuntimeError(
-        "Arabic RTL rendering requires Pillow RAQM or arabic-reshaper/python-bidi."
-    )
+    raise RuntimeError("Arabic RTL rendering requires Pillow RAQM or arabic-reshaper/python-bidi.")
 
 
 def text_bbox(draw: ImageDraw.ImageDraw, text: str, fnt: ImageFont.FreeTypeFont):
     if HAS_RAQM:
-        return draw.textbbox(
-            (0, 0),
-            text,
-            font=fnt,
-            direction="rtl",
-            language="ar",
-        )
+        return draw.textbbox((0, 0), text, font=fnt, direction="rtl", language="ar")
     return draw.textbbox((0, 0), text, font=fnt)
 
 
-def draw_rtl(
-    draw: ImageDraw.ImageDraw,
-    xy: tuple[int, int],
-    text: str,
-    fnt: ImageFont.FreeTypeFont,
-    fill,
-) -> None:
+def draw_rtl(draw: ImageDraw.ImageDraw, xy: tuple[int, int], text: str, fnt: ImageFont.FreeTypeFont, fill) -> None:
     rendered = normalize_text(text)
     if HAS_RAQM:
-        draw.text(
-            xy,
-            rendered,
-            font=fnt,
-            fill=fill,
-            direction="rtl",
-            language="ar",
-        )
+        draw.text(xy, rendered, font=fnt, fill=fill, direction="rtl", language="ar")
     else:
         draw.text(xy, rendered, font=fnt, fill=fill)
 
@@ -127,12 +98,10 @@ def wrap_rtl(text: str, fnt: ImageFont.FreeTypeFont, max_width: int) -> list[str
     words = str(text).split()
     if not words:
         return []
-
     dummy = Image.new("RGB", (10, 10))
     draw = ImageDraw.Draw(dummy)
     lines: list[str] = []
     current = words[0]
-
     for word in words[1:]:
         candidate = f"{current} {word}"
         bbox = text_bbox(draw, normalize_text(candidate), fnt)
@@ -141,26 +110,16 @@ def wrap_rtl(text: str, fnt: ImageFont.FreeTypeFont, max_width: int) -> list[str
         else:
             lines.append(current)
             current = word
-
     lines.append(current)
     return lines
 
 
-def draw_text(
-    img: Image.Image,
-    text: str,
-    y: int,
-    size: int,
-    bold: bool = False,
-    max_width: int = 900,
-    fill=(255, 255, 255),
-) -> int:
+def draw_text(img: Image.Image, text: str, y: int, size: int, bold: bool = False, max_width: int = 900, fill=(255, 255, 255)) -> int:
     draw = ImageDraw.Draw(img)
     fnt = font(size, bold)
     lines = wrap_rtl(text, fnt, max_width)
     gap = max(10, size // 5)
     cursor = y
-
     for line in lines:
         rendered = normalize_text(line)
         bbox = text_bbox(draw, rendered, fnt)
@@ -168,18 +127,10 @@ def draw_text(
         x = (WIDTH - width) // 2
         draw_rtl(draw, (x, cursor), line, fnt, fill)
         cursor += size + gap
-
     return cursor - y
 
 
-def draw_plain_center(
-    img: Image.Image,
-    text: str,
-    y: int,
-    size: int,
-    bold: bool = False,
-    fill=(255, 224, 116),
-) -> None:
+def draw_plain_center(img: Image.Image, text: str, y: int, size: int, bold: bool = False, fill=(255, 224, 116)) -> None:
     draw = ImageDraw.Draw(img)
     fnt = font(size, bold)
     value = str(text)
@@ -189,11 +140,35 @@ def draw_plain_center(
 
 
 def background(seed: int) -> Image.Image:
-    import math
+    """Use the new premium background when uploaded; otherwise keep the safe fallback."""
+    asset_name = "gold_video_background.png" if KIND == "gold" else "currency_video_background.png"
+    asset = BACKGROUND_DIR / asset_name
 
+    if asset.exists():
+        source = Image.open(asset).convert("RGB")
+        # Fill the vertical 9:16 canvas without stretching the artwork.
+        source_ratio = source.width / source.height
+        target_ratio = WIDTH / HEIGHT
+        if source_ratio > target_ratio:
+            new_h = HEIGHT
+            new_w = int(new_h * source_ratio)
+        else:
+            new_w = WIDTH
+            new_h = int(new_w / source_ratio)
+        source = source.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        left = max(0, (new_w - WIDTH) // 2)
+        top = max(0, (new_h - HEIGHT) // 2)
+        source = source.crop((left, top, left + WIDTH, top + HEIGHT))
+        # Keep the photo atmospheric and make the foreground prices/text dominant.
+        source = source.filter(ImageFilter.GaussianBlur(4.5))
+        img = source.convert("RGBA")
+        shade = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 92))
+        img.alpha_composite(shade)
+        return img
+
+    import math
     img = Image.new("RGB", (WIDTH, HEIGHT))
     px = img.load()
-
     for y in range(HEIGHT):
         t = y / max(1, HEIGHT - 1)
         base = int(10 + 18 * (1 - t))
@@ -201,10 +176,8 @@ def background(seed: int) -> Image.Image:
         for x in range(WIDTH):
             glow = int(18 * max(0, 1 - abs(x - WIDTH * 0.5) / (WIDTH * 0.5)))
             px[x, y] = (base + glow // 3, base + glow // 4, gold)
-
     overlay = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
     d = ImageDraw.Draw(overlay)
-
     for i in range(9):
         y = 320 + i * 175
         pts = []
@@ -212,13 +185,11 @@ def background(seed: int) -> Image.Image:
             yy = y + int(34 * math.sin((x / 110.0) + seed * 0.8 + i))
             pts.append((x, yy))
         d.line(pts, fill=(238, 194, 73, 42), width=4)
-
     for i in range(16):
         x = (seed * 97 + i * 173) % WIDTH
         y = (seed * 53 + i * 211) % HEIGHT
         r = 3 + (i % 4) * 2
         d.ellipse((x - r, y - r, x + r, y + r), fill=(250, 214, 110, 68))
-
     overlay = overlay.filter(ImageFilter.GaussianBlur(0.8))
     return Image.alpha_composite(img.convert("RGBA"), overlay)
 
@@ -226,13 +197,7 @@ def background(seed: int) -> Image.Image:
 def panel(img: Image.Image, box: tuple[int, int, int, int]) -> None:
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
-    d.rounded_rectangle(
-        box,
-        radius=32,
-        fill=(6, 9, 16, 218),
-        outline=(231, 190, 76, 180),
-        width=3,
-    )
+    d.rounded_rectangle(box, radius=32, fill=(6, 9, 16, 218), outline=(231, 190, 76, 180), width=3)
     img.alpha_composite(layer)
 
 
@@ -244,11 +209,9 @@ def footer(img: Image.Image) -> None:
 def make_intro(content: dict) -> Path:
     img = background(1)
     panel(img, (65, 360, 1015, 1410))
-
     title = "أسعار الذهب اليوم" if KIND == "gold" else "سعر الدولار اليوم"
     draw_text(img, title, 150, 64, True, 920, (248, 219, 132))
     draw_text(img, content["hook"], 475, 46, True, 860, (246, 246, 248))
-
     if KIND == "gold":
         first = content["videoData"]["markets"][0]
         val = first["karats"]["21"]
@@ -258,7 +221,6 @@ def make_intro(content: dict) -> Path:
         rates = {item["code"]: item["value"] for item in content["videoData"]["rates"]}
         draw_text(img, "1 دولار =", 845, 52, True, 850, (235, 236, 241))
         draw_text(img, f"{fx_money(rates['EGP'])} جنيه مصري", 935, 90, True, 850, (255, 224, 116))
-
     footer(img)
     path = FRAMES / "01_intro.png"
     img.convert("RGB").save(path, quality=95)
@@ -270,21 +232,13 @@ def make_gold_market_slide(item: dict, index: int) -> Path:
     panel(img, (70, 260, 1010, 1540))
     draw_text(img, item["name"], 340, 54, True, 900, (248, 219, 132))
     draw_text(img, "سعر الجرام", 445, 36, False, 850, (220, 223, 230))
-
-    cards = [
-        ("24", item["karats"]["24"]),
-        ("22", item["karats"]["22"]),
-        ("21", item["karats"]["21"]),
-        ("18", item["karats"]["18"]),
-    ]
-
+    cards = [("24", item["karats"]["24"]), ("22", item["karats"]["22"]), ("21", item["karats"]["21"]), ("18", item["karats"]["18"])]
     y = 585
     for karat, value in cards:
         panel(img, (130, y, 950, y + 190))
         draw_text(img, f"عيار {karat}", y + 28, 42, True, 760, (244, 244, 247))
         draw_text(img, f"{money(value)} {item['unit']}", y + 82, 58, True, 760, (255, 224, 116))
         y += 225
-
     footer(img)
     path = FRAMES / f"gold_{index:02d}.png"
     img.convert("RGB").save(path, quality=95)
@@ -331,198 +285,14 @@ def fx_money(value: float) -> str:
 
 
 def audio_duration(path: Path) -> float:
-    output = subprocess.check_output(
-        [
-            "ffprobe",
-            "-v",
-            "error",
-            "-show_entries",
-            "format=duration",
-            "-of",
-            "default=noprint_wrappers=1:nokey=1",
-            str(path),
-        ],
-        text=True,
-    ).strip()
+    output = subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(path)], text=True).strip()
     return max(1.0, float(output))
 
 
 def make_segment(image_path: Path, duration: float, index: int) -> Path:
     segment = ARTIFACTS / f"{KIND}_segment_{index:02d}.mp4"
-    vf = (
-        "zoompan="
-        "z='min(zoom+0.0007,1.08)':"
-        "x='iw/2-(iw/zoom/2)':"
-        "y='ih/2-(ih/zoom/2)':"
-        "d=1:s=1080x1920:fps=30,"
-        "format=yuv420p"
-    )
-
-    run([
-        "ffmpeg", "-y",
-        "-loop", "1",
-        "-i", str(image_path),
-        "-t", f"{duration:.3f}",
-        "-vf", vf,
-        "-an",
-        "-c:v", "libx264",
-        "-preset", "veryfast",
-        "-crf", "21",
-        "-pix_fmt", "yuv420p",
-        str(segment),
-    ])
-
+    vf = "zoompan=z='min(zoom+0.0007,1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,format=yuv420p"
+    run(["ffmpeg", "-y", "-loop", "1", "-i", str(image_path), "-t", f"{duration:.3f}", "-vf", vf, "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p", str(segment)])
     if not segment.exists() or segment.stat().st_size == 0:
-        raise RuntimeError(f"Video segment was not created: {segment}")
-
+        raise RuntimeError(f"Segment was not created: {segment}")
     return segment
-
-
-def concat_segments(segments: list[Path]) -> Path:
-    list_file = ARTIFACTS / f"{KIND}_segments.txt"
-    list_file.write_text(
-        "".join(
-            f"file '{p.as_posix().replace(chr(39), chr(39) + chr(92) + chr(39) + chr(39))}'\n"
-            for p in segments
-        ),
-        encoding="utf-8",
-    )
-    silent = ARTIFACTS / f"{KIND}_silent.mp4"
-
-    run([
-        "ffmpeg", "-y",
-        "-f", "concat",
-        "-safe", "0",
-        "-i", str(list_file),
-        "-c", "copy",
-        str(silent),
-    ])
-
-    if not silent.exists() or silent.stat().st_size == 0:
-        raise RuntimeError(f"Silent video was not created: {silent}")
-
-    return silent
-
-
-def mux_audio(video_path: Path, audio_path: Path, duration: float) -> None:
-    run([
-        "ffmpeg", "-y",
-        "-i", str(video_path),
-        "-i", str(audio_path),
-        "-t", f"{duration:.3f}",
-        "-map", "0:v:0",
-        "-map", "1:a:0",
-        "-c:v", "copy",
-        "-c:a", "aac",
-        "-b:a", "160k",
-        "-af", "apad",
-        "-shortest",
-        str(OUTPUT),
-    ])
-
-    if not OUTPUT.exists() or OUTPUT.stat().st_size == 0:
-        raise RuntimeError(f"Final MP4 was not created: {OUTPUT}")
-
-
-def main() -> None:
-    global FONT_REGULAR, FONT_BOLD
-
-    if KIND not in {"gold", "currency"}:
-        raise SystemExit("VIDEO_TYPE must be gold or currency")
-
-    for tool in ("ffmpeg", "ffprobe"):
-        if shutil.which(tool) is None:
-            raise SystemExit(f"{tool} is required")
-
-    if not CONTENT.exists():
-        raise SystemExit(f"{CONTENT} not found")
-    if not AUDIO.exists():
-        raise SystemExit(f"{AUDIO} not found")
-
-    FONT_REGULAR = find_font(False)
-    FONT_BOLD = find_font(True)
-
-    print(f"Arabic RAQM support: {HAS_RAQM}", flush=True)
-    print(f"Regular font: {FONT_REGULAR}", flush=True)
-    print(f"Bold font: {FONT_BOLD}", flush=True)
-
-    content = json.loads(CONTENT.read_text(encoding="utf-8"))
-    if not VOICE_TIMING.exists():
-        raise SystemExit(f"{VOICE_TIMING} not found")
-    voice_timing = json.loads(VOICE_TIMING.read_text(encoding="utf-8"))
-    scene_durations = [
-        float(item["durationSeconds"])
-        for item in voice_timing.get("segments", [])
-        if float(item.get("durationSeconds", 0)) > 0
-    ]
-    FRAMES.mkdir(parents=True, exist_ok=True)
-
-    for old in ARTIFACTS.glob(f"{KIND}_segment_*.mp4"):
-        old.unlink(missing_ok=True)
-    OUTPUT.unlink(missing_ok=True)
-
-    slides = [make_intro(content)]
-
-    if KIND == "gold":
-        for idx, item in enumerate(content["videoData"]["markets"], start=1):
-            slides.append(make_gold_market_slide(item, idx))
-    else:
-        for idx, item in enumerate(content["videoData"]["rates"], start=1):
-            slides.append(make_currency_slide(item, idx))
-
-    slides.append(make_cta())
-
-    voice_duration = audio_duration(AUDIO)
-    total = voice_duration
-
-    if voice_duration < 20.0 or voice_duration > 40.0:
-        raise SystemExit(
-            f"Generated narration duration is {voice_duration:.2f}s; expected 20-40s."
-        )
-
-    if len(scene_durations) != len(slides):
-        raise SystemExit(
-            f"Voice/video scene mismatch: {len(scene_durations)} voice segments for "
-            f"{len(slides)} video slides."
-        )
-
-    durations = scene_durations
-    segments = [
-        make_segment(slides[i], durations[i], i + 1)
-        for i in range(len(slides))
-    ]
-
-    silent = concat_segments(segments)
-    mux_audio(silent, AUDIO, total)
-
-    metadata = {
-        "generatedAt": content.get("generatedAt"),
-        "videoType": KIND,
-        "video": str(OUTPUT.relative_to(ROOT)),
-        "width": WIDTH,
-        "height": HEIGHT,
-        "fps": FPS,
-        "durationSeconds": round(total, 3),
-        "voiceGender": content.get("voiceGender"),
-        "voiceName": content.get("voiceName"),
-        "websiteName": "موقع ذهب وأسعار",
-        "websiteUrl": "https://goldandrates.com/",
-        "font": "Tajawal",
-        "arabicRtl": True,
-        "hook": content.get("hook"),
-        "hashtags": content.get("hashtags", []),
-        "overrideApplied": content.get("overrideApplied", False),
-    }
-
-    (ARTIFACTS / f"{KIND}_video.json").write_text(
-        json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-
-    print(f"Generated: {OUTPUT}", flush=True)
-    print(f"Duration: {total:.2f}s", flush=True)
-    print(f"Scene durations: {[round(x, 2) for x in durations]}", flush=True)
-
-
-if __name__ == "__main__":
-    main()
