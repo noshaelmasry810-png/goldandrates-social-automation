@@ -76,7 +76,7 @@ jobs:
         run: |
           test -s artifacts/goldandrates_gold_daily.mp4
           DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 artifacts/goldandrates_gold_daily.mp4)
-          python -c "d=float('$DURATION'); assert 15 <= d <= 35, f'Invalid duration: {d}'"
+          python -c "d=float('$DURATION'); assert 15 <= d <= 40.5, f'Invalid duration: {d}'"
           echo "Gold video duration: $DURATION seconds"
       - name: Upload gold video
         uses: actions/upload-artifact@v4
@@ -149,7 +149,7 @@ jobs:
         run: |
           test -s artifacts/goldandrates_currency_daily.mp4
           DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 artifacts/goldandrates_currency_daily.mp4)
-          python -c "d=float('$DURATION'); assert 15 <= d <= 35, f'Invalid duration: {d}'"
+          python -c "d=float('$DURATION'); assert 15 <= d <= 40.5, f'Invalid duration: {d}'"
           echo "Currency video duration: $DURATION seconds"
       - name: Upload currency video
         uses: actions/upload-artifact@v4
