@@ -194,6 +194,8 @@ def make_gold_market_slide(item, index):
         local_center(f"{money(item['karats'][karat])} {item['unit']}", 92, 58, accent)
         row_path = FRAMES / f"gold_{index:02d}_row_{n}.png"
         layer.save(row_path)
+        # Keep the price cards visible while using one simple FADE IN for the video.
+        img.alpha_composite(layer, ((WIDTH - 870) // 2, 500 + n * 235))
     footer(img)
     p = FRAMES / f"gold_{index:02d}_base.png"; img.convert("RGB").save(p, quality=96); return p
 
