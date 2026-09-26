@@ -1,0 +1,40 @@
+name: Temporary Gold Voice Fix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-gold-voice-limit.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Shorten gold narration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/content/generate_social_content.py')
+          s = p.read_text(encoding='utf-8')
+          old = '''        "بصّوا معانا على أسعار الذهب النهارده من موقع ذهب وأسعار.",'''
+          new = '''        "أسعار الذهب النهارده من موقع ذهب وأسعار.",'''
+          if old not in s:
+              raise SystemExit('Intro narration text not found')
+          s = s.replace(old, new, 1)
+          old = '''        "ولكل الأسعار والتحديثات أول بأول، تابعوا موقع ذهب وأسعار على goldandrates.com."'''
+          new = '''        "تابعوا موقع ذهب وأسعار على goldandrates.com."'''
+          if old not in s:
+              raise SystemExit('CTA narration text not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/content/generate_social_content.py
+          git commit -m 'Shorten gold narration to stay within 40 seconds'
+          git push
