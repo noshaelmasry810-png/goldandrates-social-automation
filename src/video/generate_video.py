@@ -222,6 +222,8 @@ def make_gold_market_slide(item, index):
         layer.save(row_path)
         layers.append((row_path, (WIDTH - 870) // 2, 500 + n * 235, 0.25))
 
+    # Fixed footer: date, site name and URL are baked into the slide background.
+    footer(img)
     p = FRAMES / f"gold_{index:02d}_base.png"
     img.convert("RGB").save(p, quality=96)
     GOLD_LAYERS[str(p)] = layers
