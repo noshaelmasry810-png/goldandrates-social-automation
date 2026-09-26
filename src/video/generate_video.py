@@ -23,6 +23,7 @@ CONTENT = DATA_DIR / ("gold_content.json" if KIND == "gold" else "currency_conte
 MUSIC = ROOT / "assets" / "music" / "news_bulletin.mp3"
 OUTPUT = ARTIFACTS / f"goldandrates_{KIND}_daily.mp4"
 FONT_REGULAR = FONT_BOLD = None
+GOLD_LAYERS = {}
 
 
 def run(cmd):
@@ -154,28 +155,55 @@ def today_ar():
 
 
 def make_intro(content):
-    # Clean centered hook: no rectangle and safely sized for the 1080px frame.
+    # Static background; only each text element fades in independently.
     img = background()
-    d = ImageDraw.Draw(img)
+    layers = []
+    def text_layer(name, draw_fn, delay):
+        layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        draw_fn(ImageDraw.Draw(layer))
+        p = FRAMES / name
+        layer.save(p)
+        layers.append((p, 0, 0, delay))
     if KIND == "gold":
-        centered(d, "النشرة اليومية لأسعار الذهب", 585, 52, True, (255, 224, 116))
+        title = "النشرة اليومية لأسعار الذهب"
         hook = "عيار 21 عامل كام النهارده؟"
+        accent = (255, 224, 116)
     else:
-        centered(d, "النشرة اليومية لأسعار العملات", 585, 50, True, (105, 205, 255))
+        title = "النشرة اليومية لأسعار العملات"
         hook = "الدولار وصل لكام النهارده؟"
-    centered(d, hook, 735, 78, True, (255, 255, 255))
-    centered(d, today_ar(), 1035, 42, True, (225, 229, 238))
-    footer(img)
+        accent = (105, 205, 255)
+    text_layer("intro_title.png", lambda d: centered(d, title, 585, 52, True, accent), 0.25)
+    text_layer("intro_hook.png", lambda d: centered(d, hook, 735, 78, True, (255, 255, 255)), 1.00)
+    text_layer("intro_date.png", lambda d: centered(d, today_ar(), 1035, 42, True, (225, 229, 238)), 1.85)
+    # Draw footer separately because footer() needs an actual layer object.
+    footer_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    footer(footer_layer)
+    footer_path = FRAMES / "intro_footer.png"
+    footer_layer.save(footer_path)
+    layers[-1] = (footer_path, 0, 0, 2.65)
+
     p = FRAMES / "01_intro.png"
     img.convert("RGB").save(p, quality=96)
+    GOLD_LAYERS[str(p)] = layers
     return p
 
 def make_gold_market_slide(item, index):
-    # Build a clean base plus four transparent, independently animated price cards.
-    img = background(); d = ImageDraw.Draw(img)
-    centered(d, item["name"], 270, 58, True, (255, 224, 116))
-    centered(d, "أسعار الجرام اليوم", 360, 38, True, (224, 227, 235))
-    y0 = 500
+    # Static background; country title, subtitle, each price card and footer fade independently.
+    img = background()
+    layers = []
+
+    def full_text(name, draw_fn, delay):
+        layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        draw_fn(ImageDraw.Draw(layer))
+        p = FRAMES / name
+        layer.save(p)
+        layers.append((p, 0, 0, delay))
+
+    full_text(f"gold_{index:02d}_title.png",
+              lambda d: centered(d, item["name"], 270, 58, True, (255, 224, 116)), 0.25)
+    full_text(f"gold_{index:02d}_subtitle.png",
+              lambda d: centered(d, "أسعار الجرام اليوم", 360, 38, True, (224, 227, 235)), 0.85)
+
     for n, karat in enumerate(("24", "22", "21", "18")):
         layer = Image.new("RGBA", (870, 210), (0, 0, 0, 0))
         ld = ImageDraw.Draw(layer)
@@ -194,10 +222,18 @@ def make_gold_market_slide(item, index):
         local_center(f"{money(item['karats'][karat])} {item['unit']}", 92, 58, accent)
         row_path = FRAMES / f"gold_{index:02d}_row_{n}.png"
         layer.save(row_path)
-        # Keep the price cards visible while using one simple FADE IN for the video.
-        img.alpha_composite(layer, ((WIDTH - 870) // 2, 500 + n * 235))
-    footer(img)
-    p = FRAMES / f"gold_{index:02d}_base.png"; img.convert("RGB").save(p, quality=96); return p
+        layers.append((row_path, (WIDTH - 870) // 2, 500 + n * 235, 1.45 + n * 0.75))
+
+    footer_layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    footer(footer_layer)
+    footer_path = FRAMES / f"gold_{index:02d}_footer.png"
+    footer_layer.save(footer_path)
+    layers.append((footer_path, 0, 0, 4.75))
+
+    p = FRAMES / f"gold_{index:02d}_base.png"
+    img.convert("RGB").save(p, quality=96)
+    GOLD_LAYERS[str(p)] = layers
+    return p
 
 def make_currency_slide(item, index):
     img = background(); d = ImageDraw.Draw(img)
@@ -211,25 +247,68 @@ def make_currency_slide(item, index):
 
 
 def make_cta():
-    img = background(); d = ImageDraw.Draw(img)
-    centered(d, "كل الأسعار بتتحدث أول بأول", 520, 56, True, (245, 246, 249))
-    centered(d, "تابع النشرة اليومية", 640, 76, True, (255, 224, 116) if KIND == "gold" else (105, 205, 255))
-    centered(d, "وزور موقع ذهب وأسعار", 785, 54, True, (245, 246, 249))
-    centered(d, "www.goldandrates.com", 900, 60, True, (255, 224, 116) if KIND == "gold" else (105, 205, 255))
-    footer(img)
-    p = FRAMES / "99_cta.png"; img.convert("RGB").save(p, quality=96); return p
-
+    img = background()
+    layers = []
+    accent = (255, 224, 116) if KIND == "gold" else (105, 205, 255)
+    specs = [
+        ("cta_1.png", "كل الأسعار بتتحدث أول بأول", 520, 56, (245, 246, 249), 0.25),
+        ("cta_2.png", "تابع النشرة اليومية", 640, 76, accent, 1.05),
+        ("cta_3.png", "وزور موقع ذهب وأسعار", 785, 54, (245, 246, 249), 1.85),
+        ("cta_4.png", "www.goldandrates.com", 900, 60, accent, 2.65),
+    ]
+    for name, text_value, y, size, fill, delay in specs:
+        layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        centered(ImageDraw.Draw(layer), text_value, y, size, True, fill)
+        p = FRAMES / name
+        layer.save(p)
+        layers.append((p, 0, 0, delay))
+    p = FRAMES / "99_cta.png"
+    img.convert("RGB").save(p, quality=96)
+    GOLD_LAYERS[str(p)] = layers
+    return p
 
 def make_segment(image_path, duration, index):
     segment = ARTIFACTS / f"{KIND}_segment_{index:02d}.mp4"
-    # One consistent animation language across the whole video: simple professional FADE IN only.
-    vf = "fade=t=in:st=0:d=0.65,format=yuv420p"
-    run([
-        "ffmpeg", "-y", "-loop", "1", "-i", image_path,
-        "-t", f"{duration:.3f}", "-vf", vf, "-an",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "19",
-        "-pix_fmt", "yuv420p", segment
-    ])
+
+    # Gold uses a truly static background. Each text/card layer gets its own
+    # independent alpha FADE IN; no slide, zoom, click or background animation.
+    layers = GOLD_LAYERS.get(str(image_path)) if KIND == "gold" else None
+    if not layers:
+        vf = "fade=t=in:st=0:d=0.65,format=yuv420p"
+        run([
+            "ffmpeg", "-y", "-loop", "1", "-i", image_path,
+            "-t", f"{duration:.3f}", "-vf", vf, "-an",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "19",
+            "-pix_fmt", "yuv420p", segment
+        ])
+    else:
+        cmd = ["ffmpeg", "-y", "-loop", "1", "-i", image_path]
+        for layer_path, _, _, _ in layers:
+            cmd += ["-loop", "1", "-i", layer_path]
+
+        filters = []
+        previous = "[0:v]"
+        for i, (layer_path, x, y, delay) in enumerate(layers):
+            label = f"l{i}"
+            out = f"v{i}"
+            filters.append(
+                f"[{i+1}:v]format=rgba,fade=t=in:st={delay:.2f}:d=0.55:alpha=1[{label}]"
+            )
+            filters.append(
+                f"{previous}[{label}]overlay=x={x}:y={y}:eof_action=repeat[{out}]"
+            )
+            previous = f"[{out}]"
+        filters.append(f"{previous}format=yuv420p[vout]")
+
+        cmd += [
+            "-t", f"{duration:.3f}",
+            "-filter_complex", ";".join(filters),
+            "-map", "[vout]", "-an",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "19",
+            "-pix_fmt", "yuv420p", segment
+        ]
+        run(cmd)
+
     if not segment.exists() or segment.stat().st_size == 0:
         raise RuntimeError(f"Video segment was not created: {segment}")
     return segment
