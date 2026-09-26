@@ -314,12 +314,12 @@ def build_gold_content(data: dict, voice_gender: str, voice_profile: dict, trend
     # Narration is intentionally conversational Egyptian Arabic and split by scene
     # so every spoken market has a matching visual card.
     voice_lines = [
-        "بصّوا معانا على أسعار الذهب النهارده من موقع ذهب وأسعار.",
+        "أسعار الذهب النهارده من موقع ذهب وأسعار.",
         "في مصر، جرام الذهب عيار 21 بـ " + money(gold["EGP"]["karats"]["21"]) + " جنيه.",
         "في السعودية، جرام الذهب عيار 21 بـ " + money(gold["SAR"]["karats"]["21"]) + " ريال.",
         "وفي الإمارات، جرام الذهب عيار 21 بـ " + money(gold["AED"]["karats"]["21"]) + " درهم.",
         "أما الكويت، فجرام الذهب عيار 21 بـ " + money(gold["KWD"]["karats"]["21"]) + " دينار.",
-        "ولكل الأسعار والتحديثات أول بأول، تابعوا موقع ذهب وأسعار على goldandrates.com."
+        "تابعوا موقع ذهب وأسعار على goldandrates.com."
     ]
 
     description_parts = [
