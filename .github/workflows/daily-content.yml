@@ -13,8 +13,8 @@ on:
           - both
         default: gold
   schedule:
+    - cron: "0 6 * * *"
     - cron: "0 7 * * *"
-    - cron: "0 8 * * *"
 
 concurrency:
   group: goldandrates-daily-videos
@@ -26,7 +26,7 @@ permissions:
 jobs:
   gold:
     if: >-
-      (github.event_name == 'schedule' && github.event.schedule == '0 7 * * *') ||
+      (github.event_name == 'schedule' && github.event.schedule == '0 6 * * *') ||
       (github.event_name == 'workflow_dispatch' && (inputs.video_type == 'gold' || inputs.video_type == 'both'))
     runs-on: ubuntu-latest
     env:
@@ -128,13 +128,22 @@ jobs:
 
           youtube = build("youtube", "v3", credentials=credentials)
 
+          content_path = "data/gold_content.json"
+          with open(content_path, "r", encoding="utf-8") as f:
+              gold = json.load(f)
+
+          title = gold.get("hook") or gold.get("videoData", {}).get("title") or "أسعار الذهب اليوم | ذهب وأسعار"
+          description = gold.get("description") or gold.get("caption") or ""
+          tags = [str(tag).strip() for tag in gold.get("keywords", []) if str(tag).strip()][:15]
+
+          if "www.goldandrates.com" not in description:
+              description += "\n\nموقع ذهب وأسعار\nwww.goldandrates.com"
+
           body = {
               "snippet": {
-                  "title": "أسعار الذهب اليوم | GoldAndRates",
-                  "description": (
-                      "أسعار الذهب اليوم وتحديثات سوق الذهب من GoldAndRates.\n\n"
-                      "تابع GoldAndRates لمعرفة أحدث أسعار الذهب والعملات."
-                  ),
+                  "title": title,
+                  "description": description,
+                  "tags": tags,
                   "categoryId": "25",
               },
               "status": {
@@ -142,6 +151,9 @@ jobs:
                   "selfDeclaredMadeForKids": False,
               },
           }
+
+          print(f"YouTube title: {title}")
+          print(f"YouTube tags: {tags}")
 
           media = MediaFileUpload(
               "artifacts/goldandrates_gold_daily.mp4",
@@ -188,7 +200,7 @@ jobs:
 
   currency:
     if: >-
-      (github.event_name == 'schedule' && github.event.schedule == '0 8 * * *') ||
+      (github.event_name == 'schedule' && github.event.schedule == '0 7 * * *') ||
       (github.event_name == 'workflow_dispatch' && (inputs.video_type == 'currency' || inputs.video_type == 'both'))
     runs-on: ubuntu-latest
     env:
@@ -290,13 +302,22 @@ jobs:
 
           youtube = build("youtube", "v3", credentials=credentials)
 
+          content_path = "data/currency_content.json"
+          with open(content_path, "r", encoding="utf-8") as f:
+              currency = json.load(f)
+
+          title = currency.get("hook") or currency.get("videoData", {}).get("title") or "أسعار العملات اليوم | ذهب وأسعار"
+          description = currency.get("description") or currency.get("caption") or ""
+          tags = [str(tag).strip() for tag in currency.get("keywords", []) if str(tag).strip()][:15]
+
+          if "www.goldandrates.com" not in description:
+              description += "\n\nموقع ذهب وأسعار\nwww.goldandrates.com"
+
           body = {
               "snippet": {
-                  "title": "أسعار العملات اليوم | GoldAndRates",
-                  "description": (
-                      "أسعار العملات اليوم وتحديثات سوق العملات من GoldAndRates.\n\n"
-                      "تابع GoldAndRates لمعرفة أحدث أسعار الذهب والعملات."
-                  ),
+                  "title": title,
+                  "description": description,
+                  "tags": tags,
                   "categoryId": "25",
               },
               "status": {
@@ -304,6 +325,9 @@ jobs:
                   "selfDeclaredMadeForKids": False,
               },
           }
+
+          print(f"YouTube title: {title}")
+          print(f"YouTube tags: {tags}")
 
           media = MediaFileUpload(
               "artifacts/goldandrates_currency_daily.mp4",
