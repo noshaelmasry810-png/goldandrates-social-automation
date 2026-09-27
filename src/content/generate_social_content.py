@@ -24,6 +24,7 @@ DIRECT_FX_TERMS = ["الدولار", "سعر الدولار", "الدولار ا
 TREND_RULES = [(["سعر الذهب", "اسعار الذهب", "أسعار الذهب"], "#سعر_الذهب"), (["عيار 21"], "#عيار_21"), (["عيار 24"], "#عيار_24"), (["عيار 22"], "#عيار_22"), (["عيار 18"], "#عيار_18"), (["الجنيه الذهب"], "#الجنيه_الذهب"), (["سبائك الذهب", "سبيكة ذهب"], "#سبائك_الذهب"), (["الذهب", "ذهب", "gold"], "#الذهب")]
 GOLD_EVERGREEN = ["#سعر_الذهب", "#أسعار_الذهب", "#الذهب", "#ذهب", "#سعر_الذهب_اليوم", "#أسعار_الذهب_اليوم", "#ذهب_وأسعار", "#Gold", "#GoldPrice"]
 FX_EVERGREEN = ["#سعر_الدولار", "#الدولار", "#الدولار_اليوم", "#أسعار_العملات", "#سعر_الصرف", "#ذهب_وأسعار", "#GoldAndRates", "#goldandrates"]
+MUSIC_ATTRIBUTION = ["", "🎵 الموسيقى: No Copyright Music For News TV and Radio", "المصدر: free music", "الرخصة: Creative Commons Attribution (CC BY)", "https://www.youtube.com/watch?v=I3PR_S2nWyQ"]
 
 def fetch_trending_queries(geo):
     request = urllib.request.Request(TREND_URL.format(geo=geo), headers={"User-Agent": "GoldAndRates-Social-Automation/2.0", "Accept": "application/rss+xml, application/xml, text/xml"})
@@ -113,7 +114,7 @@ def build_gold_content(data, voice_gender, voice_profile, trends):
     for item in prices:
         description_parts.append(item["name"])
         for karat in ["24", "22", "21", "18"]: description_parts.append(f"عيار {karat}: {money(item['karats'][karat])} {item['unit']}")
-    description_parts.extend(["", "موقع ذهب وأسعار", "www.goldandrates.com", "", " ".join(hashtags)])
+    description_parts.extend(["", "موقع ذهب وأسعار", "www.goldandrates.com"] + MUSIC_ATTRIBUTION + ["", " ".join(hashtags)])
     return {"kind":"gold","generatedAt":data["generatedAtUtc"],"language":"ar","voiceGender":voice_gender,"voiceName":voice_profile["voice"],"voiceLabel":voice_profile["label"],"voiceLocale":voice_profile["locale"],"keywords":GOLD_KEYWORDS,"trendSignals":trends,"hashtags":hashtags,"hook":hook,"caption":"\n".join(description_parts),"description":"\n".join(description_parts),"prices":prices,"voiceScript":" ".join(voice_lines),"voiceSegments":voice_lines,"videoData":{"title":"أسعار الذهب اليوم - موقع ذهب وأسعار","websiteName":"موقع ذهب وأسعار","websiteUrl":"https://www.goldandrates.com/","markets":prices,"hook":hook,"hashtags":hashtags}}
 
 def build_currency_content(data, voice_gender, voice_profile, trends):
@@ -121,7 +122,7 @@ def build_currency_content(data, voice_gender, voice_profile, trends):
     pairs = [{"code": code, "name": FX_UNIT[code], "unit": FX_UNIT[code], "value": rates[code], "rate": rates[code]} for code in ["EGP", "SAR", "AED", "KWD"]]
     hook = "أسعار العملات اليوم | سعر الدولار مقابل الجنيه والريال والدرهم والدينار."
     voice_segments = ["بصّوا معانا على سعر الدولار النهارده.", "الدولار النهارده بـ " + fx_money(rates["EGP"]) + " جنيه مصري.", "في السعودية، الدولار بـ " + fx_money(rates["SAR"]) + " ريال.", "وفي الإمارات، الدولار بـ " + fx_money(rates["AED"]) + " درهم.", "أما الكويت، فالدولار بـ " + fx_money(rates["KWD"]) + " دينار.", "ولكل الأسعار والتحديثات أول بأول، تابعوا موقع ذهب وأسعار على www.goldandrates.com."]
-    parts = [hook, "", "أسعار صرف الدولار:"] + [f"1 دولار = {fx_money(p['rate'])} {p['unit']}" for p in pairs] + ["", "موقع ذهب وأسعار", "www.goldandrates.com", "", " ".join(hashtags)]
+    parts = [hook, "", "أسعار صرف الدولار:"] + [f"1 دولار = {fx_money(p['rate'])} {p['unit']}" for p in pairs] + ["", "موقع ذهب وأسعار", "www.goldandrates.com"] + MUSIC_ATTRIBUTION + ["", " ".join(hashtags)]
     return {"kind":"currency","generatedAt":data["generatedAtUtc"],"language":"ar","voiceGender":voice_gender,"voiceName":voice_profile["voice"],"voiceLabel":voice_profile["label"],"voiceLocale":voice_profile["locale"],"keywords":FX_KEYWORDS,"trendSignals":trends,"hashtags":hashtags,"hook":hook,"caption":"\n".join(parts),"description":"\n".join(parts),"pairs":pairs,"voiceScript":" ".join(voice_segments),"voiceSegments":voice_segments,"videoData":{"title":"أسعار العملات اليوم - موقع ذهب وأسعار","websiteName":"موقع ذهب وأسعار","websiteUrl":"https://www.goldandrates.com/","rates":pairs,"hook":hook,"hashtags":hashtags}}
 
 def main():
