@@ -49,7 +49,7 @@ jobs:
           sudo curl -fsSL https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Bold.ttf -o /usr/local/share/fonts/Tajawal-Bold.ttf
           sudo curl -fsSL https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Medium.ttf -o /usr/local/share/fonts/Tajawal-Medium.ttf
           sudo fc-cache -f
-          python -m pip install --upgrade pillow arabic-reshaper python-bidi
+          python -m pip install --upgrade pillow arabic-reshaper python-bidi google-api-python-client google-auth-httplib2 google-auth-oauthlib
       - name: Fetch gold markets and FX
         env:
           GOLDANDRATES_PRICE_API_URL: ${{ secrets.GOLDANDRATES_PRICE_API_URL }}
@@ -78,6 +78,95 @@ jobs:
           DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 artifacts/goldandrates_gold_daily.mp4)
           python -c "d=float('$DURATION'); assert 15 <= d <= 40.5, f'Invalid duration: {d}'"
           echo "Gold video duration: $DURATION seconds"
+
+      - name: Upload gold video to YouTube
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+
+          from google.oauth2.credentials import Credentials
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+
+          token_url = "https://oauth2.googleapis.com/token"
+
+          token_data = urllib.parse.urlencode({
+              "client_id": os.environ["YOUTUBE_CLIENT_ID"],
+              "client_secret": os.environ["YOUTUBE_CLIENT_SECRET"],
+              "refresh_token": os.environ["YOUTUBE_REFRESH_TOKEN"],
+              "grant_type": "refresh_token",
+          }).encode("utf-8")
+
+          request = urllib.request.Request(
+              token_url,
+              data=token_data,
+              headers={"Content-Type": "application/x-www-form-urlencoded"},
+              method="POST",
+          )
+
+          with urllib.request.urlopen(request) as response:
+              token_response = json.loads(response.read().decode("utf-8"))
+
+          access_token = token_response.get("access_token")
+          if not access_token:
+              raise RuntimeError("Google OAuth did not return an access token.")
+
+          credentials = Credentials(
+              token=access_token,
+              token_uri=token_url,
+              client_id=os.environ["YOUTUBE_CLIENT_ID"],
+              client_secret=os.environ["YOUTUBE_CLIENT_SECRET"],
+              scopes=["https://www.googleapis.com/auth/youtube.upload"],
+          )
+
+          youtube = build("youtube", "v3", credentials=credentials)
+
+          body = {
+              "snippet": {
+                  "title": "أسعار الذهب اليوم | GoldAndRates",
+                  "description": (
+                      "أسعار الذهب اليوم وتحديثات سوق الذهب من GoldAndRates.\n\n"
+                      "تابع GoldAndRates لمعرفة أحدث أسعار الذهب والعملات."
+                  ),
+                  "categoryId": "25",
+              },
+              "status": {
+                  "privacyStatus": "public",
+                  "selfDeclaredMadeForKids": False,
+              },
+          }
+
+          media = MediaFileUpload(
+              "artifacts/goldandrates_gold_daily.mp4",
+              mimetype="video/mp4",
+              resumable=True,
+          )
+
+          upload = youtube.videos().insert(
+              part="snippet,status",
+              body=body,
+              media_body=media,
+          )
+
+          response = None
+          while response is None:
+              status, response = upload.next_chunk()
+              if status:
+                  print(f"Upload progress: {int(status.progress() * 100)}%")
+
+          video_id = response["id"]
+          print("YouTube upload completed successfully")
+          print(f"Video ID: {video_id}")
+          print(f"YouTube URL: https://www.youtube.com/watch?v={video_id}")
+          PY
+
       - name: Upload gold video
         uses: actions/upload-artifact@v4
         with:
@@ -151,6 +240,95 @@ jobs:
           DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 artifacts/goldandrates_currency_daily.mp4)
           python -c "d=float('$DURATION'); assert 15 <= d <= 40.5, f'Invalid duration: {d}'"
           echo "Currency video duration: $DURATION seconds"
+
+      - name: Upload currency video to YouTube
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+
+          from google.oauth2.credentials import Credentials
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+
+          token_url = "https://oauth2.googleapis.com/token"
+
+          token_data = urllib.parse.urlencode({
+              "client_id": os.environ["YOUTUBE_CLIENT_ID"],
+              "client_secret": os.environ["YOUTUBE_CLIENT_SECRET"],
+              "refresh_token": os.environ["YOUTUBE_REFRESH_TOKEN"],
+              "grant_type": "refresh_token",
+          }).encode("utf-8")
+
+          request = urllib.request.Request(
+              token_url,
+              data=token_data,
+              headers={"Content-Type": "application/x-www-form-urlencoded"},
+              method="POST",
+          )
+
+          with urllib.request.urlopen(request) as response:
+              token_response = json.loads(response.read().decode("utf-8"))
+
+          access_token = token_response.get("access_token")
+          if not access_token:
+              raise RuntimeError("Google OAuth did not return an access token.")
+
+          credentials = Credentials(
+              token=access_token,
+              token_uri=token_url,
+              client_id=os.environ["YOUTUBE_CLIENT_ID"],
+              client_secret=os.environ["YOUTUBE_CLIENT_SECRET"],
+              scopes=["https://www.googleapis.com/auth/youtube.upload"],
+          )
+
+          youtube = build("youtube", "v3", credentials=credentials)
+
+          body = {
+              "snippet": {
+                  "title": "أسعار العملات اليوم | GoldAndRates",
+                  "description": (
+                      "أسعار العملات اليوم وتحديثات سوق العملات من GoldAndRates.\n\n"
+                      "تابع GoldAndRates لمعرفة أحدث أسعار الذهب والعملات."
+                  ),
+                  "categoryId": "25",
+              },
+              "status": {
+                  "privacyStatus": "public",
+                  "selfDeclaredMadeForKids": False,
+              },
+          }
+
+          media = MediaFileUpload(
+              "artifacts/goldandrates_currency_daily.mp4",
+              mimetype="video/mp4",
+              resumable=True,
+          )
+
+          upload = youtube.videos().insert(
+              part="snippet,status",
+              body=body,
+              media_body=media,
+          )
+
+          response = None
+          while response is None:
+              status, response = upload.next_chunk()
+              if status:
+                  print(f"Upload progress: {int(status.progress() * 100)}%")
+
+          video_id = response["id"]
+          print("YouTube upload completed successfully")
+          print(f"Video ID: {video_id}")
+          print(f"YouTube URL: https://www.youtube.com/watch?v={video_id}")
+          PY
+
       - name: Upload currency video
         uses: actions/upload-artifact@v4
         with:
