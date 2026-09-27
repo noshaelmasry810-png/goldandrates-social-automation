@@ -1,0 +1,263 @@
+name: GoldAndRates YouTube Test Upload
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_type:
+        description: "Video to generate and upload"
+        required: true
+        type: choice
+        options:
+          - gold
+          - currency
+        default: gold
+      privacy_status:
+        description: "YouTube privacy status"
+        required: true
+        type: choice
+        options:
+          - private
+          - unlisted
+        default: private
+
+permissions:
+  contents: read
+
+jobs:
+  youtube-upload-test:
+    runs-on: ubuntu-latest
+
+    env:
+      VIDEO_TYPE: ${{ inputs.video_type }}
+      PRIVACY_STATUS: ${{ inputs.privacy_status }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install video and YouTube dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-core fontconfig curl
+
+          sudo mkdir -p /usr/local/share/fonts
+
+          sudo curl -fsSL https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Regular.ttf \
+            -o /usr/local/share/fonts/Tajawal-Regular.ttf
+
+          sudo curl -fsSL https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Bold.ttf \
+            -o /usr/local/share/fonts/Tajawal-Bold.ttf
+
+          sudo curl -fsSL https://raw.githubusercontent.com/google/fonts/main/ofl/tajawal/Tajawal-Medium.ttf \
+            -o /usr/local/share/fonts/Tajawal-Medium.ttf
+
+          sudo fc-cache -f
+
+          python -m pip install --upgrade \
+            pillow \
+            arabic-reshaper \
+            python-bidi \
+            google-api-python-client \
+            google-auth-httplib2 \
+            google-auth-oauthlib
+
+      - name: Fetch current market data
+        env:
+          GOLDANDRATES_PRICE_API_URL: ${{ secrets.GOLDANDRATES_PRICE_API_URL }}
+        run: |
+          python src/data/fetch_market_data.py
+
+      - name: Generate social content
+        run: |
+          python src/content/generate_social_content.py
+
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          video_type = os.environ["VIDEO_TYPE"]
+
+          payload = json.loads(
+              Path("data/social_content.json").read_text(encoding="utf-8")
+          )
+
+          content = payload.get(video_type)
+
+          if not isinstance(content, dict):
+              raise SystemExit(
+                  f"social_content.json does not contain a valid {video_type} object"
+              )
+
+          Path(f"data/{video_type}_content.json").write_text(
+              json.dumps(content, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8"
+          )
+
+          print(f"Synced fresh {video_type}_content.json")
+          PY
+
+      - name: Verify custom news bulletin music
+        run: |
+          test -s assets/music/news_bulletin.mp3
+          echo "Using custom music: assets/music/news_bulletin.mp3"
+
+      - name: Generate video
+        run: |
+          python -c "import sys; sys.path.insert(0, 'src/video'); from generate_video import main; main()"
+
+      - name: Validate generated video
+        run: |
+          VIDEO="artifacts/goldandrates_${VIDEO_TYPE}_daily.mp4"
+
+          test -s "$VIDEO"
+
+          DURATION=$(ffprobe \
+            -v error \
+            -show_entries format=duration \
+            -of default=noprint_wrappers=1:nokey=1 \
+            "$VIDEO")
+
+          python -c "d=float('$DURATION'); assert 15 <= d <= 40.5, f'Invalid duration: {d}'"
+
+          echo "Video: $VIDEO"
+          echo "Duration: $DURATION seconds"
+
+      - name: Upload video to YouTube
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+
+          from google.oauth2.credentials import Credentials
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+
+          video_type = os.environ["VIDEO_TYPE"]
+          privacy_status = os.environ["PRIVACY_STATUS"]
+
+          client_id = os.environ["YOUTUBE_CLIENT_ID"]
+          client_secret = os.environ["YOUTUBE_CLIENT_SECRET"]
+          refresh_token = os.environ["YOUTUBE_REFRESH_TOKEN"]
+
+          token_url = "https://oauth2.googleapis.com/token"
+
+          token_data = urllib.parse.urlencode({
+              "client_id": client_id,
+              "client_secret": client_secret,
+              "refresh_token": refresh_token,
+              "grant_type": "refresh_token",
+          }).encode("utf-8")
+
+          request = urllib.request.Request(
+              token_url,
+              data=token_data,
+              headers={
+                  "Content-Type": "application/x-www-form-urlencoded"
+              },
+              method="POST",
+          )
+
+          with urllib.request.urlopen(request) as response:
+              token_response = json.loads(
+                  response.read().decode("utf-8")
+              )
+
+          access_token = token_response.get("access_token")
+
+          if not access_token:
+              raise RuntimeError(
+                  "Google OAuth did not return an access token."
+              )
+
+          credentials = Credentials(
+              token=access_token,
+              token_uri=token_url,
+              client_id=client_id,
+              client_secret=client_secret,
+              scopes=[
+                  "https://www.googleapis.com/auth/youtube.upload"
+              ],
+          )
+
+          youtube = build(
+              "youtube",
+              "v3",
+              credentials=credentials
+          )
+
+          video_path = f"artifacts/goldandrates_{video_type}_daily.mp4"
+
+          if video_type == "gold":
+              title = "أسعار الذهب اليوم | GoldAndRates"
+              description = (
+                  "أسعار الذهب اليوم وتحديثات سوق الذهب من GoldAndRates.\n\n"
+                  "تابع GoldAndRates لمعرفة أحدث أسعار الذهب والعملات."
+              )
+          else:
+              title = "أسعار العملات اليوم | GoldAndRates"
+              description = (
+                  "أسعار العملات اليوم وتحديثات سوق العملات من GoldAndRates.\n\n"
+                  "تابع GoldAndRates لمعرفة أحدث أسعار الذهب والعملات."
+              )
+
+          body = {
+              "snippet": {
+                  "title": title,
+                  "description": description,
+                  "categoryId": "25",
+              },
+              "status": {
+                  "privacyStatus": privacy_status,
+                  "selfDeclaredMadeForKids": False,
+              },
+          }
+
+          media = MediaFileUpload(
+              video_path,
+              mimetype="video/mp4",
+              resumable=True,
+          )
+
+          request = youtube.videos().insert(
+              part="snippet,status",
+              body=body,
+              media_body=media,
+          )
+
+          response = None
+
+          while response is None:
+              status, response = request.next_chunk()
+
+              if status:
+                  print(
+                      f"Upload progress: "
+                      f"{int(status.progress() * 100)}%"
+                  )
+
+          video_id = response["id"]
+
+          print("")
+          print("========================================")
+          print("YouTube upload completed successfully")
+          print(f"Video ID: {video_id}")
+          print(f"Privacy: {privacy_status}")
+          print(
+              f"YouTube URL: https://www.youtube.com/watch?v={video_id}"
+          )
+          print("========================================")
+          PY
