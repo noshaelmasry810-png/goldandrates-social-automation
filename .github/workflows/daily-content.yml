@@ -177,6 +177,41 @@ jobs:
           print("YouTube upload completed successfully")
           print(f"Video ID: {video_id}")
           print(f"YouTube URL: https://www.youtube.com/watch?v={video_id}")
+
+          # Add the uploaded video to the dedicated gold playlist.
+          playlist_title = "النشرة اليومية لأسعار الذهب"
+          playlist_id = None
+          page_token = None
+          while True:
+              playlist_response = youtube.playlists().list(
+                  part="snippet",
+                  mine=True,
+                  maxResults=50,
+                  pageToken=page_token,
+              ).execute()
+              for item in playlist_response.get("items", []):
+                  if item.get("snippet", {}).get("title") == playlist_title:
+                      playlist_id = item["id"]
+                      break
+              if playlist_id or not playlist_response.get("nextPageToken"):
+                  break
+              page_token = playlist_response["nextPageToken"]
+
+          if not playlist_id:
+              raise RuntimeError(f"YouTube playlist not found: {playlist_title}")
+
+          youtube.playlistItems().insert(
+              part="snippet",
+              body={
+                  "snippet": {
+                      "playlistId": playlist_id,
+                      "resourceId": {"kind": "youtube#video", "videoId": video_id},
+                  }
+              },
+          ).execute()
+
+          print(f"Added video to playlist: {playlist_title}")
+          print(f"Playlist ID: {playlist_id}")
           PY
 
       - name: Upload gold video
@@ -351,6 +386,41 @@ jobs:
           print("YouTube upload completed successfully")
           print(f"Video ID: {video_id}")
           print(f"YouTube URL: https://www.youtube.com/watch?v={video_id}")
+
+          # Add the uploaded video to the dedicated currency playlist.
+          playlist_title = "النشرة اليومية لأسعار العملات"
+          playlist_id = None
+          page_token = None
+          while True:
+              playlist_response = youtube.playlists().list(
+                  part="snippet",
+                  mine=True,
+                  maxResults=50,
+                  pageToken=page_token,
+              ).execute()
+              for item in playlist_response.get("items", []):
+                  if item.get("snippet", {}).get("title") == playlist_title:
+                      playlist_id = item["id"]
+                      break
+              if playlist_id or not playlist_response.get("nextPageToken"):
+                  break
+              page_token = playlist_response["nextPageToken"]
+
+          if not playlist_id:
+              raise RuntimeError(f"YouTube playlist not found: {playlist_title}")
+
+          youtube.playlistItems().insert(
+              part="snippet",
+              body={
+                  "snippet": {
+                      "playlistId": playlist_id,
+                      "resourceId": {"kind": "youtube#video", "videoId": video_id},
+                  }
+              },
+          ).execute()
+
+          print(f"Added video to playlist: {playlist_title}")
+          print(f"Playlist ID: {playlist_id}")
           PY
 
       - name: Upload currency video
