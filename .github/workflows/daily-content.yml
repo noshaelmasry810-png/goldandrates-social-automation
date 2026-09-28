@@ -1,9 +1,6 @@
 name: GoldAndRates Daily Videos
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       video_type:
@@ -29,7 +26,6 @@ permissions:
 jobs:
   gold:
     if: >-
-      (github.event_name == 'push') ||
       (github.event_name == 'schedule' && github.event.schedule == '0 6 * * *') ||
       (github.event_name == 'workflow_dispatch' && (inputs.video_type == 'gold' || inputs.video_type == 'both'))
     runs-on: ubuntu-latest
@@ -238,18 +234,20 @@ jobs:
             artifacts/gold_video.json
           if-no-files-found: error
           retention-days: 7
-      - name: Commit gold content data
+      - name: Prepare gold data for final commit
         run: |
-          git config user.name "GoldAndRates Automation"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/gold_content.json data/prices.json
-          if git diff --cached --quiet; then echo "No gold data changes to commit."; else git commit -m "chore: update daily gold video data"; fi
-          git pull --rebase origin main
-          git push
+          mkdir -p artifacts/commit-data
+          cp data/gold_content.json artifacts/commit-data/gold_content.json
+          cp data/prices.json artifacts/commit-data/prices.json
+      - name: Upload gold data for final commit
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-content-gold-data
+          path: artifacts/commit-data/
+          if-no-files-found: error
 
   currency:
     if: >-
-      (github.event_name == 'push') ||
       (github.event_name == 'schedule' && github.event.schedule == '0 7 * * *') ||
       (github.event_name == 'workflow_dispatch' && (inputs.video_type == 'currency' || inputs.video_type == 'both'))
     runs-on: ubuntu-latest
@@ -458,11 +456,69 @@ jobs:
             artifacts/currency_video.json
           if-no-files-found: error
           retention-days: 7
-      - name: Commit currency content data
+      - name: Prepare currency data for final commit
+        run: |
+          mkdir -p artifacts/commit-data
+          cp data/currency_content.json artifacts/commit-data/currency_content.json
+          cp data/prices.json artifacts/commit-data/prices.json
+      - name: Upload currency data for final commit
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-content-currency-data
+          path: artifacts/commit-data/
+          if-no-files-found: error
+
+  commit:
+    if: >-
+      always() &&
+      (needs.gold.result == 'success' || needs.currency.result == 'success')
+    needs:
+      - gold
+      - currency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download gold data
+        if: needs.gold.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: daily-content-gold-data
+          path: staging/gold
+
+      - name: Download currency data
+        if: needs.currency.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: daily-content-currency-data
+          path: staging/currency
+
+      - name: Merge generated data
+        run: |
+          if [ -f staging/gold/gold_content.json ]; then
+            cp staging/gold/gold_content.json data/gold_content.json
+          fi
+          if [ -f staging/currency/currency_content.json ]; then
+            cp staging/currency/currency_content.json data/currency_content.json
+          fi
+          if [ -f staging/gold/prices.json ]; then
+            cp staging/gold/prices.json data/prices.json
+          elif [ -f staging/currency/prices.json ]; then
+            cp staging/currency/prices.json data/prices.json
+          fi
+
+      - name: Commit all generated data once
         run: |
           git config user.name "GoldAndRates Automation"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/currency_content.json
-          if git diff --cached --quiet; then echo "No currency data changes to commit."; else git commit -m "chore: update daily currency video data"; fi
+          git add data/gold_content.json data/currency_content.json data/prices.json
+          if git diff --cached --quiet; then
+            echo "No generated data changes to commit."
+            exit 0
+          fi
+          git commit -m "chore: update daily social video data"
           git pull --rebase origin main
           git push
