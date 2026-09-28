@@ -33,8 +33,13 @@ def graph_post(path, fields=None, files=None):
     else:
         encoded = urllib.parse.urlencode(data).encode()
         req = urllib.request.Request(url, data=encoded, headers={"Content-Type": "application/x-www-form-urlencoded"}, method="POST")
-    with urllib.request.urlopen(req) as response:
-        return json.loads(response.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req) as response:
+            raw = response.read().decode("utf-8")
+            return json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Graph API HTTP {exc.code} for {path}: {error_body}") from exc
 
 
 def graph_get(path, params):
@@ -88,8 +93,13 @@ def publish_instagram(video_path, page_id, page_token, ig_token, caption):
         },
         method="POST",
     )
-    with urllib.request.urlopen(upload_req) as response:
-        upload_result = json.loads(response.read().decode("utf-8")) if response.read else {}
+    try:
+        with urllib.request.urlopen(upload_req) as response:
+            raw = response.read().decode("utf-8")
+            upload_result = json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Instagram resumable upload HTTP {exc.code}: {error_body}") from exc
     print(f"Instagram upload response: {upload_result}")
 
     for _ in range(30):
@@ -124,13 +134,21 @@ def main():
     with open(content_path, "r", encoding="utf-8") as f:
         content = json.load(f)
 
-    title = content.get("hook") or content.get("videoData", {}).get("title") or "أسعار الذهب اليوم"
-    description = content.get("description") or content.get("caption") or ""
-    if "www.goldandrates.com" not in description:
-        description += "\n\nموقع ذهب وأسعار\nwww.goldandrates.com"
+    platforms = content.get("platforms") or {}
+    facebook = platforms.get("facebook") or {}
+    instagram = platforms.get("instagram") or {}
 
-    publish_facebook(video_path, page_id, page_token, title, description)
-    publish_instagram(video_path, page_id, page_token, ig_token, description)
+    title = facebook.get("title") or content.get("hook") or content.get("videoData", {}).get("title") or "أسعار الذهب اليوم"
+    facebook_caption = facebook.get("caption") or content.get("description") or content.get("caption") or ""
+    instagram_caption = instagram.get("caption") or facebook_caption
+
+    if "www.goldandrates.com" not in facebook_caption:
+        facebook_caption += "\n\nموقع ذهب وأسعار\nwww.goldandrates.com"
+    if "www.goldandrates.com" not in instagram_caption:
+        instagram_caption += "\n\nموقع ذهب وأسعار\nwww.goldandrates.com"
+
+    publish_facebook(video_path, page_id, page_token, title, facebook_caption)
+    publish_instagram(video_path, page_id, page_token, ig_token, instagram_caption)
     print("Meta publishing completed successfully.")
 
 
