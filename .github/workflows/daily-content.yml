@@ -1,6 +1,9 @@
 name: GoldAndRates Daily Videos
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       video_type:
@@ -26,6 +29,7 @@ permissions:
 jobs:
   gold:
     if: >-
+      (github.event_name == 'push') ||
       (github.event_name == 'schedule' && github.event.schedule == '0 6 * * *') ||
       (github.event_name == 'workflow_dispatch' && (inputs.video_type == 'gold' || inputs.video_type == 'both'))
     runs-on: ubuntu-latest
@@ -245,6 +249,7 @@ jobs:
 
   currency:
     if: >-
+      (github.event_name == 'push') ||
       (github.event_name == 'schedule' && github.event.schedule == '0 7 * * *') ||
       (github.event_name == 'workflow_dispatch' && (inputs.video_type == 'currency' || inputs.video_type == 'both'))
     runs-on: ubuntu-latest
