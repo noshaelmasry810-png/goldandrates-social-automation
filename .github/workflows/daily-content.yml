@@ -79,6 +79,15 @@ jobs:
           python -c "d=float('$DURATION'); assert 15 <= d <= 40.5, f'Invalid duration: {d}'"
           echo "Gold video duration: $DURATION seconds"
 
+      - name: Publish gold video to Facebook and Instagram
+        env:
+          FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+          META_INSTAGRAM_ACCESS_TOKEN: ${{ secrets.META_INSTAGRAM_ACCESS_TOKEN }}
+          META_VIDEO_PATH: artifacts/goldandrates_gold_daily.mp4
+          META_CONTENT_PATH: data/gold_content.json
+        run: python src/social/meta_publish.py
+
       - name: Upload gold video to YouTube
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
@@ -287,6 +296,15 @@ jobs:
           DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 artifacts/goldandrates_currency_daily.mp4)
           python -c "d=float('$DURATION'); assert 15 <= d <= 40.5, f'Invalid duration: {d}'"
           echo "Currency video duration: $DURATION seconds"
+
+      - name: Publish currency video to Facebook and Instagram
+        env:
+          FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+          META_INSTAGRAM_ACCESS_TOKEN: ${{ secrets.META_INSTAGRAM_ACCESS_TOKEN }}
+          META_VIDEO_PATH: artifacts/goldandrates_currency_daily.mp4
+          META_CONTENT_PATH: data/currency_content.json
+        run: python src/social/meta_publish.py
 
       - name: Upload currency video to YouTube
         env:
