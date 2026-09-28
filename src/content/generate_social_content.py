@@ -159,7 +159,7 @@ def build_currency_content(data, voice_gender, voice_profile, trends):
     parts = [hook, "", "أسعار صرف الدولار:"] + [f"1 دولار = {fx_money(p['rate'])} {p['unit']}" for p in pairs] + ["", "موقع ذهب وأسعار", "www.goldandrates.com", "", " ".join(hashtags)]
     description = "\n".join(parts)
     platforms = build_platform_metadata("currency", hook, description, FX_KEYWORDS, hashtags)
-    return {"kind":"currency","generatedAt":data["generatedAtUtc"],"language":"ar","voiceGender":voice_gender,"voiceName":voice_profile["voice"],"voiceLabel":voice_profile["voice"],"voiceLocale":voice_profile["locale"],"keywords":FX_KEYWORDS,"trendSignals":trends,"hashtags":hashtags,"hook":hook,"caption":description,"description":description,"platforms":platforms,"pairs":pairs,"voiceScript":" ".join(voice_segments),"voiceSegments":voice_segments,"videoData":{"title":"أسعار العملات اليوم - موقع ذهب وأسعار","websiteName":"موقع ذهب وأسعار","websiteUrl":"https://www.goldandrates.com/","rates":pairs,"hook":hook,"hashtags":hashtags}}
+    return {"kind":"currency","generatedAt":data["generatedAtUtc"],"language":"ar","voiceGender":voice_gender,"voiceName":voice_profile["voice"],"voiceLabel":voice_profile["label"],"voiceLocale":voice_profile["locale"],"keywords":FX_KEYWORDS,"trendSignals":trends,"hashtags":hashtags,"hook":hook,"caption":description,"description":description,"platforms":platforms,"pairs":pairs,"voiceScript":" ".join(voice_segments),"voiceSegments":voice_segments,"videoData":{"title":"أسعار العملات اليوم - موقع ذهب وأسعار","websiteName":"موقع ذهب وأسعار","websiteUrl":"https://www.goldandrates.com/","rates":pairs,"hook":hook,"hashtags":hashtags}}
 
 def main():
     if not MARKET_DATA.exists(): raise SystemExit(f"Missing {MARKET_DATA}")
