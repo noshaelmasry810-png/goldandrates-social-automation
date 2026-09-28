@@ -1,11 +1,12 @@
 import json
 import os
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
-GRAPH_VERSION = "v23.0"
+GRAPH_VERSION = "v26.0"
 GRAPH_BASE = f"https://graph.facebook.com/{GRAPH_VERSION}"
 
 
@@ -29,10 +30,20 @@ def graph_post(path, fields=None, files=None):
             body.extend(content)
             body.extend(b"\r\n")
         body.extend(f"--{boundary}--\r\n".encode())
-        req = urllib.request.Request(url, data=bytes(body), headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}, method="POST")
+        req = urllib.request.Request(
+            url,
+            data=bytes(body),
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+            method="POST",
+        )
     else:
         encoded = urllib.parse.urlencode(data).encode()
-        req = urllib.request.Request(url, data=encoded, headers={"Content-Type": "application/x-www-form-urlencoded"}, method="POST")
+        req = urllib.request.Request(
+            url,
+            data=encoded,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method="POST",
+        )
     try:
         with urllib.request.urlopen(req) as response:
             raw = response.read().decode("utf-8")
@@ -45,21 +56,96 @@ def graph_post(path, fields=None, files=None):
 def graph_get(path, params):
     query = urllib.parse.urlencode(params)
     req = urllib.request.Request(GRAPH_BASE + path + "?" + query, method="GET")
-    with urllib.request.urlopen(req) as response:
-        return json.loads(response.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Graph API GET HTTP {exc.code} for {path}: {error_body}") from exc
 
 
 def publish_facebook(video_path, page_id, page_token, title, description):
+    """Publish a Page video using Meta's resumable Page Videos upload flow."""
+    file_size = os.path.getsize(video_path)
+    videos_path = f"/{page_id}/videos"
+
+    # Phase 1: initialize the upload session.
+    start = graph_post(
+        videos_path,
+        fields={
+            "upload_phase": "start",
+            "file_size": str(file_size),
+            "access_token": page_token,
+        },
+    )
+    upload_session_id = start.get("upload_session_id")
+    start_offset = int(start.get("start_offset", 0))
+    end_offset = int(start.get("end_offset", 0))
+    if not upload_session_id:
+        raise RuntimeError(f"Facebook upload initialization failed: {start}")
+
+    print(
+        f"Facebook upload initialized: session={upload_session_id}, "
+        f"offset={start_offset}/{end_offset}, size={file_size}"
+    )
+
+    # Phase 2: transfer chunks until Meta reports the full file is uploaded.
     with open(video_path, "rb") as f:
-        result = graph_post(
-            f"/{page_id}/videos",
-            fields={"access_token": page_token, "title": title, "description": description},
-            files={"source": (Path(video_path).name, f.read(), "video/mp4")},
-        )
-    video_id = result.get("id")
-    if not video_id:
-        raise RuntimeError(f"Facebook upload failed: {result}")
-    print(f"Facebook Page video published: {video_id}")
+        while start_offset < file_size:
+            f.seek(start_offset)
+            chunk_size = max(1, end_offset - start_offset)
+            chunk = f.read(chunk_size)
+            if not chunk:
+                raise RuntimeError(
+                    f"Facebook upload stopped before the file was fully transferred: "
+                    f"offset={start_offset}, size={file_size}"
+                )
+
+            transfer = graph_post(
+                videos_path,
+                fields={
+                    "upload_phase": "transfer",
+                    "upload_session_id": upload_session_id,
+                    "start_offset": str(start_offset),
+                    "access_token": page_token,
+                },
+                files={
+                    "video_file_chunk": (
+                        Path(video_path).name,
+                        chunk,
+                        "video/mp4",
+                    )
+                },
+            )
+
+            next_offset = int(transfer.get("start_offset", start_offset + len(chunk)))
+            next_end = int(transfer.get("end_offset", file_size))
+            print(f"Facebook upload progress: {next_offset}/{file_size}")
+
+            if next_offset <= start_offset:
+                raise RuntimeError(f"Facebook upload did not advance: {transfer}")
+
+            start_offset = next_offset
+            end_offset = next_end if next_end > start_offset else file_size
+
+    # Phase 3: finish and publish the video.
+    finish = graph_post(
+        videos_path,
+        fields={
+            "upload_phase": "finish",
+            "upload_session_id": upload_session_id,
+            "title": title,
+            "description": description,
+            "published": "true",
+            "access_token": page_token,
+        },
+    )
+
+    if finish.get("success") is not True:
+        raise RuntimeError(f"Facebook video publish failed: {finish}")
+
+    video_id = finish.get("video_id") or finish.get("id")
+    print(f"Facebook Page video published successfully: {video_id or 'success'}")
 
 
 def publish_instagram(video_path, page_id, page_token, ig_token, caption):
