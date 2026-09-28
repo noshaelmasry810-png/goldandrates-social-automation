@@ -18,12 +18,12 @@ GOLD_UNIT = {"EGP": "جنيه مصري", "SAR": "ريال سعودي", "AED": "�
 FX_UNIT = GOLD_UNIT.copy()
 BRAND_HASHTAGS = ["#ذهب_وأسعار", "#GoldAndRates", "#goldandrates"]
 GOLD_KEYWORDS = ["سعر الذهب اليوم", "أسعار الذهب اليوم", "سعر الذهب في مصر", "سعر الذهب في السعودية", "سعر الذهب في الإمارات", "سعر الذهب في الكويت", "سعر جرام الذهب", "عيار 21", "عيار 24", "عيار 22", "عيار 18", "الجنيه الذهب", "الذهب اليوم"]
-FX_KEYWORDS = ["سعر الدولار اليوم", "سعر الدولار مقابل الجنيه", "الدولار مقابل الريال السعودي", "الدولار مقابل الدرهم الإماراتي", "الدولار مقابل الدينار الكويتي", "1 دولار بكام", "سعر الدولار الآن", "أسعار العملات اليوم"]
+FX_KEYWORDS = ["سعر الدولار اليوم", "سعر الدولار مقابل الجنيه", "الدولار مقابل الريال السعودي", "الدولار مقابل الدرهم الإماراتي", "الدولار مقابل الدينار الكويتي", "1 دولار بكام", "سعر الدولار الآن", "أسعار العملات اليوم", "أسعار الدولار في مصر", "سعر الدولار في السعودية", "سعر الدولار في الإمارات", "سعر الدولار في الكويت"]
 DIRECT_GOLD_TERMS = ["الذهب", "ذهب", "gold", "gold price", "gold prices", "سعر الذهب", "اسعار الذهب", "أسعار الذهب", "عيار 18", "عيار 21", "عيار 22", "عيار 24", "جرام الذهب", "الجنيه الذهب", "سبائك الذهب", "سبيكة ذهب", "xau", "bullion"]
 DIRECT_FX_TERMS = ["الدولار", "سعر الدولار", "الدولار اليوم", "دولار مقابل", "usd", "exchange rate", "currency", "currencies", "سعر الصرف", "أسعار العملات", "الجنيه المصري", "الريال السعودي", "الدرهم الإماراتي", "الدينار الكويتي"]
 TREND_RULES = [(["سعر الذهب", "اسعار الذهب", "أسعار الذهب"], "#سعر_الذهب"), (["عيار 21"], "#عيار_21"), (["عيار 24"], "#عيار_24"), (["عيار 22"], "#عيار_22"), (["عيار 18"], "#عيار_18"), (["الجنيه الذهب"], "#الجنيه_الذهب"), (["سبائك الذهب", "سبيكة ذهب"], "#سبائك_الذهب"), (["الذهب", "ذهب", "gold"], "#الذهب")]
 GOLD_EVERGREEN = ["#سعر_الذهب", "#أسعار_الذهب", "#الذهب", "#ذهب", "#سعر_الذهب_اليوم", "#أسعار_الذهب_اليوم", "#ذهب_وأسعار", "#Gold", "#GoldPrice"]
-FX_EVERGREEN = ["#سعر_الدولار", "#الدولار", "#الدولار_اليوم", "#أسعار_العملات", "#سعر_الصرف", "#ذهب_وأسعار", "#GoldAndRates", "#goldandrates"]
+FX_EVERGREEN = ["#سعر_الدولار", "#الدولار", "#الدولار_اليوم", "#أسعار_العملات", "#سعر_الصرف", "#الدولار_مصر", "#الدولار_السعودية", "#الدولار_الإمارات", "#الدولار_الكويت", "#ذهب_وأسعار", "#GoldAndRates", "#goldandrates"]
 
 def fetch_trending_queries(geo):
     request = urllib.request.Request(TREND_URL.format(geo=geo), headers={"User-Agent": "GoldAndRates-Social-Automation/2.0", "Accept": "application/rss+xml, application/xml, text/xml"})
@@ -104,56 +104,38 @@ def build_hashtags(kind, trends):
         if len(tags) >= 15: break
     return tags
 
+def today_title_date():
+    now = datetime.now(timezone.utc)
+    months = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
+    return f"{now.day} {months[now.month - 1]} {now.year}"
+
+def unique_paragraphs(text):
+    seen = set(); result = []
+    for part in re.split(r"\n\s*\n", text.strip()):
+        clean = part.strip()
+        if not clean: continue
+        key = re.sub(r"\s+", " ", clean).strip()
+        if key not in seen:
+            seen.add(key); result.append(clean)
+    return "\n\n".join(result)
+
 def build_platform_metadata(kind, hook, description, keywords, hashtags):
     is_gold = kind == "gold"
-    youtube_title = (
-        "أسعار الذهب اليوم في مصر والسعودية والإمارات والكويت | عيار 21 و24"
-        if is_gold
-        else "أسعار العملات اليوم | سعر الدولار مقابل الجنيه والريال والدرهم والدينار"
-    )
-    facebook_title = (
-        "أسعار الذهب اليوم في مصر والسعودية والإمارات والكويت"
-        if is_gold
-        else "أسعار العملات اليوم | سعر الدولار مقابل الجنيه والريال والدرهم والدينار"
-    )
-    instagram_intro = (
-        "أسعار الذهب اليوم في مصر والسعودية والإمارات والكويت.\nتابعوا أسعار عيارات الذهب وتحديثاتها أولًا بأول."
-        if is_gold
-        else "أسعار العملات اليوم وسعر الدولار مقابل الجنيه والريال والدرهم والدينار.\nتابعوا تحديثات أسعار الصرف أولًا بأول."
-    )
-    tiktok_intro = (
-        "أسعار الذهب اليوم في مصر والسعودية والإمارات والكويت."
-        if is_gold
-        else "أسعار العملات اليوم وسعر الدولار مقابل الجنيه والريال والدرهم والدينار."
-    )
+    date_label = today_title_date()
+    base_title = ("أسعار الذهب اليوم في مصر والسعودية والإمارات والكويت" if is_gold else "أسعار العملات اليوم | سعر الدولار مقابل الجنيه والريال والدرهم والدينار")
+    social_title = f"{base_title} | {date_label}"
+    youtube_title = (f"أسعار الذهب اليوم في مصر والسعودية والإمارات والكويت | عيار 21 و24 | {date_label}" if is_gold else f"{base_title} | {date_label}")
+    instagram_intro = social_title + ("\nتابعوا أسعار عيارات الذهب وتحديثاتها أولًا بأول." if is_gold else "\nتابعوا تحديثات أسعار الصرف أولًا بأول.")
+    tiktok_intro = social_title
     yt_tags = [str(x).strip() for x in keywords if str(x).strip()][:20]
-    yt_hashtags = hashtags[:5]
-    fb_hashtags = hashtags[:5]
-    ig_hashtags = hashtags[:10]
-    tt_hashtags = hashtags[:7]
-
-    return {
-        "youtube": {
-            "title": youtube_title,
-            "description": description,
-            "keywords": yt_tags,
-            "hashtags": yt_hashtags,
-        },
-        "facebook": {
-            "title": facebook_title,
-            "caption": f"{hook}\n\n{description.split(chr(10) + chr(10) + 'موقع ذهب وأسعار')[0]}\n\n" + " ".join(fb_hashtags),
-            "hashtags": fb_hashtags,
-        },
-        "instagram": {
-            "caption": f"{instagram_intro}\n\nموقع ذهب وأسعار\nwww.goldandrates.com\n\n" + " ".join(ig_hashtags),
-            "hashtags": ig_hashtags,
-        },
-        "tiktok": {
-            "title": tiktok_intro,
-            "caption": f"{tiktok_intro}\n\nموقع ذهب وأسعار\nwww.goldandrates.com\n\n" + " ".join(tt_hashtags),
-            "hashtags": tt_hashtags,
-        },
-    }
+    yt_hashtags = hashtags[:8]; fb_hashtags = hashtags[:8]; ig_hashtags = hashtags[:15]; tt_hashtags = hashtags[:10]
+    body = description
+    if body.startswith(hook): body = body[len(hook):].lstrip("\n ")
+    body = unique_paragraphs(body)
+    facebook_caption = unique_paragraphs(f"{social_title}\n\n{body}")
+    instagram_caption = unique_paragraphs(f"{instagram_intro}\n\nموقع ذهب وأسعار\nwww.goldandrates.com\n\n" + " ".join(ig_hashtags))
+    tiktok_caption = unique_paragraphs(f"{tiktok_intro}\n\nموقع ذهب وأسعار\nwww.goldandrates.com\n\n" + " ".join(tt_hashtags))
+    return {"youtube": {"title": youtube_title, "description": description, "keywords": yt_tags, "hashtags": yt_hashtags}, "facebook": {"title": social_title, "caption": facebook_caption, "hashtags": fb_hashtags}, "instagram": {"caption": instagram_caption, "hashtags": ig_hashtags}, "tiktok": {"title": tiktok_intro, "caption": tiktok_caption, "hashtags": tt_hashtags}}
 
 def build_gold_content(data, voice_gender, voice_profile, trends):
     gold = data["gold"]; hashtags = build_hashtags("gold", trends)
@@ -177,7 +159,7 @@ def build_currency_content(data, voice_gender, voice_profile, trends):
     parts = [hook, "", "أسعار صرف الدولار:"] + [f"1 دولار = {fx_money(p['rate'])} {p['unit']}" for p in pairs] + ["", "موقع ذهب وأسعار", "www.goldandrates.com", "", " ".join(hashtags)]
     description = "\n".join(parts)
     platforms = build_platform_metadata("currency", hook, description, FX_KEYWORDS, hashtags)
-    return {"kind":"currency","generatedAt":data["generatedAtUtc"],"language":"ar","voiceGender":voice_gender,"voiceName":voice_profile["voice"],"voiceLabel":voice_profile["label"],"voiceLocale":voice_profile["locale"],"keywords":FX_KEYWORDS,"trendSignals":trends,"hashtags":hashtags,"hook":hook,"caption":description,"description":description,"platforms":platforms,"pairs":pairs,"voiceScript":" ".join(voice_segments),"voiceSegments":voice_segments,"videoData":{"title":"أسعار العملات اليوم - موقع ذهب وأسعار","websiteName":"موقع ذهب وأسعار","websiteUrl":"https://www.goldandrates.com/","rates":pairs,"hook":hook,"hashtags":hashtags}}
+    return {"kind":"currency","generatedAt":data["generatedAtUtc"],"language":"ar","voiceGender":voice_gender,"voiceName":voice_profile["voice"],"voiceLabel":voice_profile["voice"],"voiceLocale":voice_profile["locale"],"keywords":FX_KEYWORDS,"trendSignals":trends,"hashtags":hashtags,"hook":hook,"caption":description,"description":description,"platforms":platforms,"pairs":pairs,"voiceScript":" ".join(voice_segments),"voiceSegments":voice_segments,"videoData":{"title":"أسعار العملات اليوم - موقع ذهب وأسعار","websiteName":"موقع ذهب وأسعار","websiteUrl":"https://www.goldandrates.com/","rates":pairs,"hook":hook,"hashtags":hashtags}}
 
 def main():
     if not MARKET_DATA.exists(): raise SystemExit(f"Missing {MARKET_DATA}")
