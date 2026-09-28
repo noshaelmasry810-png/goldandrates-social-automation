@@ -141,9 +141,10 @@ jobs:
           with open(content_path, "r", encoding="utf-8") as f:
               gold = json.load(f)
 
-          title = gold.get("hook") or gold.get("videoData", {}).get("title") or "أسعار الذهب اليوم | ذهب وأسعار"
-          description = gold.get("description") or gold.get("caption") or ""
-          tags = [str(tag).strip() for tag in gold.get("keywords", []) if str(tag).strip()][:15]
+          youtube_meta = (gold.get("platforms") or {}).get("youtube") or {}
+          title = youtube_meta.get("title") or gold.get("hook") or gold.get("videoData", {}).get("title") or "أسعار الذهب اليوم | ذهب وأسعار"
+          description = youtube_meta.get("description") or gold.get("description") or gold.get("caption") or ""
+          tags = [str(tag).strip() for tag in youtube_meta.get("keywords", gold.get("keywords", [])) if str(tag).strip()][:20]
 
           if "www.goldandrates.com" not in description:
               description += "\n\nموقع ذهب وأسعار\nwww.goldandrates.com"
@@ -359,9 +360,10 @@ jobs:
           with open(content_path, "r", encoding="utf-8") as f:
               currency = json.load(f)
 
-          title = currency.get("hook") or currency.get("videoData", {}).get("title") or "أسعار العملات اليوم | ذهب وأسعار"
-          description = currency.get("description") or currency.get("caption") or ""
-          tags = [str(tag).strip() for tag in currency.get("keywords", []) if str(tag).strip()][:15]
+          youtube_meta = (currency.get("platforms") or {}).get("youtube") or {}
+          title = youtube_meta.get("title") or currency.get("hook") or currency.get("videoData", {}).get("title") or "أسعار العملات اليوم | ذهب وأسعار"
+          description = youtube_meta.get("description") or currency.get("description") or currency.get("caption") or ""
+          tags = [str(tag).strip() for tag in youtube_meta.get("keywords", currency.get("keywords", [])) if str(tag).strip()][:20]
 
           if "www.goldandrates.com" not in description:
               description += "\n\nموقع ذهب وأسعار\nwww.goldandrates.com"
